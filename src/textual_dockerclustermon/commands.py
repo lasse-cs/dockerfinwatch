@@ -9,5 +9,17 @@ class CommandResult:
     exit_code: int
 
 
+class CommandError(Exception):
+    pass
+
+
+class CommandConnectionError(CommandError):
+    pass
+
+
+class CommandTimeoutError(CommandError):
+    pass
+
+
 class CommandRunner(Protocol):
     def run(self, command: str, timeout_seconds: int) -> CommandResult: ...

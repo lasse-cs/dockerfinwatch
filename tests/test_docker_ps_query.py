@@ -1,6 +1,6 @@
 import pytest
 
-from textual_dockerclustermon.commands import CommandResult
+from textual_dockerclustermon.commands import CommandConnectionError, CommandResult
 from textual_dockerclustermon.docker import DockerPsError, DockerPsQuery
 
 
@@ -12,6 +12,11 @@ class FakeRunner:
     def run(self, command: str, timeout_seconds: int) -> CommandResult:
         self.commands.append(command)
         return self.result
+
+
+class FailingRunner:
+    def run(self, command: str, timeout_seconds: int) -> CommandResult:
+        raise CommandConnectionError("authentication failed")
 
 
 def test_docker_ps_query_returns_containers_from_json_lines() -> None:
@@ -51,3 +56,11 @@ def test_docker_ps_query_raises_when_docker_ps_fails() -> None:
         DockerPsQuery(runner).fetch()
 
     assert "permission denied" in str(error.value)
+
+
+def test_docker_ps_query_wraps_command_runner_failures() -> None:
+    with pytest.raises(DockerPsError) as error:
+        DockerPsQuery(FailingRunner()).fetch()
+
+    assert "could not run docker ps" in str(error.value)
+    assert isinstance(error.value.__cause__, CommandConnectionError)
