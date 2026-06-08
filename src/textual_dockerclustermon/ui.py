@@ -3,6 +3,7 @@ from typing import Protocol
 from textual.app import App, ComposeResult
 from textual.widgets import DataTable, Footer, Header, Static
 
+from textual_dockerclustermon.docker import DockerPsError
 from textual_dockerclustermon.monitor import MonitorSnapshot
 
 
@@ -37,8 +38,17 @@ class DockerClusterMonitorApp(App[None]):
         self._refresh()
 
     def _refresh(self) -> None:
-        snapshot = self._monitor.refresh()
+        try:
+            snapshot = self._monitor.refresh()
+        except DockerPsError as error:
+            self._show_error(f"docker ps failed: {error}")
+            return
+
         self._show_snapshot(snapshot)
+
+    def _show_error(self, message: str) -> None:
+        status = self.query_one("#status", Static)
+        status.update(message)
 
     def _show_snapshot(self, snapshot: MonitorSnapshot) -> None:
         status = self.query_one("#status", Static)
