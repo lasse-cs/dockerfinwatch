@@ -137,7 +137,9 @@ async def test_app_shows_status_when_docker_ps_refresh_fails() -> None:
 
         status = app.query_one("#status", Static)
         table = app.query_one("#containers", DataTable)
-        await wait_until(lambda: status.content == "docker ps failed: permission denied")
+        await wait_until(
+            lambda: status.content == "docker ps failed: permission denied"
+        )
 
         assert status.content == "docker ps failed: permission denied"
         assert table.row_count == 0
@@ -161,7 +163,9 @@ async def test_app_preserves_table_when_manual_refresh_fails() -> None:
         await wait_until(lambda: table.row_count == 1)
 
         await pilot.press("r")
-        await wait_until(lambda: status.content == "docker ps failed: permission denied")
+        await wait_until(
+            lambda: status.content == "docker ps failed: permission denied"
+        )
 
         assert status.content == "docker ps failed: permission denied"
         assert table.row_count == 1

@@ -81,7 +81,9 @@ class SSHCommandRunner:
         except TimeoutError as error:
             raise CommandTimeoutError(f"command timed out: {command}") from error
         except (OSError, paramiko.SSHException) as error:
-            raise CommandConnectionError(f"could not run SSH command: {error}") from error
+            raise CommandConnectionError(
+                f"could not run SSH command: {error}"
+            ) from error
 
     def _connect_if_needed(self, timeout_seconds: int) -> None:
         if self._client is not None:

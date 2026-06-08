@@ -86,6 +86,5 @@ class DockerClusterMonitorApp(App[None]):
             )
         )
         status.update(
-            f"{snapshot.server_name} | last updated "
-            f"{snapshot.updated_at:%H:%M:%S %Z}"
+            f"{snapshot.server_name} | last updated {snapshot.updated_at:%H:%M:%S %Z}"
         )

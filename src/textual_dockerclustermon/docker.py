@@ -32,7 +32,9 @@ class DockerPsQuery:
             raise DockerPsError(f"could not run docker ps: {error}") from error
 
         if result.exit_code != 0:
-            raise DockerPsError(result.stderr or f"docker ps exited with {result.exit_code}")
+            raise DockerPsError(
+                result.stderr or f"docker ps exited with {result.exit_code}"
+            )
 
         return [self._container_from_line(line) for line in result.stdout.splitlines()]
 
