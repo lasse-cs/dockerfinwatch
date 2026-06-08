@@ -7,7 +7,7 @@ from textual_dockerclustermon.docker import Container
 
 
 @dataclass(frozen=True)
-class DockerPsSnapshot:
+class MonitorSnapshot:
     server_name: str
     containers: list[Container]
     updated_at: datetime
@@ -32,8 +32,8 @@ class MonitorService:
         self._docker_ps_query = docker_ps_query
         self._clock = clock
 
-    def refresh(self) -> DockerPsSnapshot:
-        return DockerPsSnapshot(
+    def refresh(self) -> MonitorSnapshot:
+        return MonitorSnapshot(
             server_name=self._server_name,
             containers=self._docker_ps_query.fetch(),
             updated_at=self._clock(),
