@@ -1,3 +1,5 @@
+import asyncio
+import threading
 from datetime import UTC, datetime
 
 import pytest
@@ -7,6 +9,7 @@ from textual.widgets import DataTable, Static
 from textual_dockerclustermon.docker import Container
 from textual_dockerclustermon.monitor import MonitorRefreshError, MonitorSnapshot
 from textual_dockerclustermon.ui import DockerClusterMonitorApp
+from helpers import wait_until
 
 
 class FakeMonitorService:
@@ -16,6 +19,22 @@ class FakeMonitorService:
 
     def refresh(self) -> MonitorSnapshot:
         self.refresh_count += 1
+        return self.snapshot
+
+
+class BlockingMonitorService:
+    def __init__(self, snapshot: MonitorSnapshot) -> None:
+        self.snapshot = snapshot
+        self.refresh_count = 0
+        self.thread_id: int | None = None
+        self.started = threading.Event()
+        self.release = threading.Event()
+
+    def refresh(self) -> MonitorSnapshot:
+        self.refresh_count += 1
+        self.thread_id = threading.get_ident()
+        self.started.set()
+        self.release.wait(timeout=1)
         return self.snapshot
 
 
@@ -75,6 +94,7 @@ async def test_app_displays_monitor_snapshot_in_table() -> None:
 
         status = app.query_one("#status", Static)
         table = app.query_one("#containers", DataTable)
+        await wait_until(lambda: status.content == "prod | last updated 12:30:00 UTC")
 
         assert monitor.refresh_count == 1
         assert status.content == "prod | last updated 12:30:00 UTC"
@@ -87,6 +107,28 @@ async def test_app_displays_monitor_snapshot_in_table() -> None:
 
 
 @pytest.mark.asyncio
+async def test_app_runs_refresh_in_worker_thread() -> None:
+    main_thread_id = threading.get_ident()
+    monitor = BlockingMonitorService(snapshot_with_container("web"))
+    app = DockerClusterMonitorApp(monitor)
+
+    async with app.run_test() as pilot:
+        await pilot.pause()
+
+        status = app.query_one("#status", Static)
+        assert status.content == "Refreshing..."
+        assert await asyncio.to_thread(monitor.started.wait, 1)
+        assert monitor.thread_id != main_thread_id
+
+        await pilot.press("r")
+        await pilot.pause()
+        assert monitor.refresh_count == 1
+
+        monitor.release.set()
+        await wait_until(lambda: status.content == "prod | last updated 12:30:00 UTC")
+
+
+@pytest.mark.asyncio
 async def test_app_shows_status_when_docker_ps_refresh_fails() -> None:
     app = DockerClusterMonitorApp(FailingMonitorService())
 
@@ -95,6 +137,7 @@ async def test_app_shows_status_when_docker_ps_refresh_fails() -> None:
 
         status = app.query_one("#status", Static)
         table = app.query_one("#containers", DataTable)
+        await wait_until(lambda: status.content == "docker ps failed: permission denied")
 
         assert status.content == "docker ps failed: permission denied"
         assert table.row_count == 0
@@ -113,10 +156,12 @@ async def test_app_preserves_table_when_manual_refresh_fails() -> None:
 
     async with app.run_test() as pilot:
         await pilot.pause()
-        await pilot.press("r")
-
         status = app.query_one("#status", Static)
         table = app.query_one("#containers", DataTable)
+        await wait_until(lambda: table.row_count == 1)
+
+        await pilot.press("r")
+        await wait_until(lambda: status.content == "docker ps failed: permission denied")
 
         assert status.content == "docker ps failed: permission denied"
         assert table.row_count == 1

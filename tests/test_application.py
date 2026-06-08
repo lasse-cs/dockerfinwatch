@@ -2,6 +2,7 @@ import pytest
 from textual.coordinate import Coordinate
 from textual.widgets import DataTable, Static
 
+from helpers import wait_until
 from textual_dockerclustermon.application import create_app
 
 
@@ -24,6 +25,7 @@ kind = "demo"
 
         status = app.query_one("#status", Static)
         table = app.query_one("#containers", DataTable)
+        await wait_until(lambda: table.row_count == 2)
 
         assert status.content.startswith("demo-prod | last updated ")
         assert table.row_count == 2
