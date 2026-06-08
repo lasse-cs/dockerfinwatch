@@ -25,5 +25,6 @@ exclude-newer = "P7D"
 [dependency-groups]
 dev = [
     "pytest>=9.0.3",
+    "pytest-asyncio>=1.4.0",
     "ruff>=0.15.15",
 ]

@@ -1,2 +1,4 @@
 def main() -> None:
-    print("Hello from textual-dockerclustermon!")
+    from textual_dockerclustermon.demo import main as demo_main
+
+    demo_main()

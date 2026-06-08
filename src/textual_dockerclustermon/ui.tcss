@@ -1,0 +1,13 @@
+Screen {
+    layout: vertical;
+}
+
+#status {
+    background: $panel;
+    height: 1;
+    padding: 0 1;
+}
+
+#containers {
+    height: 1fr;
+}
