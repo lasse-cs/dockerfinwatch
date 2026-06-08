@@ -1,7 +1,9 @@
 from datetime import UTC, datetime
 
-from textual_dockerclustermon.docker import Container
-from textual_dockerclustermon.monitor import MonitorService
+import pytest
+
+from textual_dockerclustermon.docker import Container, DockerPsError
+from textual_dockerclustermon.monitor import MonitorRefreshError, MonitorService
 
 
 class FakeDockerPsQuery:
@@ -12,6 +14,11 @@ class FakeDockerPsQuery:
     def fetch(self) -> list[Container]:
         self.fetch_count += 1
         return self.containers
+
+
+class FailingDockerPsQuery:
+    def fetch(self) -> list[Container]:
+        raise DockerPsError("permission denied")
 
 
 def test_monitor_service_returns_server_snapshot() -> None:
@@ -37,3 +44,14 @@ def test_monitor_service_returns_server_snapshot() -> None:
     assert snapshot.server_name == "prod"
     assert snapshot.containers == containers
     assert snapshot.updated_at == updated_at
+
+
+def test_monitor_service_wraps_docker_ps_errors() -> None:
+    with pytest.raises(MonitorRefreshError) as error:
+        MonitorService(
+            server_name="prod",
+            docker_ps_query=FailingDockerPsQuery(),
+        ).refresh()
+
+    assert str(error.value) == "docker ps failed: permission denied"
+    assert isinstance(error.value.__cause__, DockerPsError)

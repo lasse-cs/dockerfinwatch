@@ -4,8 +4,8 @@ import pytest
 from textual.coordinate import Coordinate
 from textual.widgets import DataTable, Static
 
-from textual_dockerclustermon.docker import Container, DockerPsError
-from textual_dockerclustermon.monitor import MonitorSnapshot
+from textual_dockerclustermon.docker import Container
+from textual_dockerclustermon.monitor import MonitorRefreshError, MonitorSnapshot
 from textual_dockerclustermon.ui import DockerClusterMonitorApp
 
 
@@ -21,16 +21,16 @@ class FakeMonitorService:
 
 class FailingMonitorService:
     def refresh(self) -> MonitorSnapshot:
-        raise DockerPsError("permission denied")
+        raise MonitorRefreshError("docker ps failed: permission denied")
 
 
 class SequenceMonitorService:
-    def __init__(self, results: list[MonitorSnapshot | DockerPsError]) -> None:
+    def __init__(self, results: list[MonitorSnapshot | MonitorRefreshError]) -> None:
         self.results = results
 
     def refresh(self) -> MonitorSnapshot:
         result = self.results.pop(0)
-        if isinstance(result, DockerPsError):
+        if isinstance(result, MonitorRefreshError):
             raise result
         return result
 
@@ -106,7 +106,7 @@ async def test_app_preserves_table_when_manual_refresh_fails() -> None:
         SequenceMonitorService(
             [
                 snapshot_with_container("web"),
-                DockerPsError("permission denied"),
+                MonitorRefreshError("docker ps failed: permission denied"),
             ]
         )
     )

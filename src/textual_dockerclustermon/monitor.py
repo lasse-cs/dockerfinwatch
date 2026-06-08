@@ -3,7 +3,7 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import Protocol
 
-from textual_dockerclustermon.docker import Container
+from textual_dockerclustermon.docker import Container, DockerPsError
 
 
 @dataclass(frozen=True)
@@ -11,6 +11,10 @@ class MonitorSnapshot:
     server_name: str
     containers: list[Container]
     updated_at: datetime
+
+
+class MonitorRefreshError(Exception):
+    pass
 
 
 class DockerPsQuery(Protocol):
@@ -33,8 +37,13 @@ class MonitorService:
         self._clock = clock
 
     def refresh(self) -> MonitorSnapshot:
+        try:
+            containers = self._docker_ps_query.fetch()
+        except DockerPsError as error:
+            raise MonitorRefreshError(f"docker ps failed: {error}") from error
+
         return MonitorSnapshot(
             server_name=self._server_name,
-            containers=self._docker_ps_query.fetch(),
+            containers=containers,
             updated_at=self._clock(),
         )
