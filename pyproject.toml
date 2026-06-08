@@ -1,0 +1,28 @@
+[project]
+name = "textual-dockerclustermon"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+authors = [
+    { name = "lasse-cs" }
+]
+requires-python = ">=3.14"
+dependencies = [
+    "paramiko>=5.0.0",
+    "textual>=8.2.7",
+]
+
+[project.scripts]
+textual-dockerclustermon = "textual_dockerclustermon:main"
+
+[build-system]
+requires = ["uv_build>=0.11.8,<0.12.0"]
+build-backend = "uv_build"
+
+[tool.uv]
+exclude-newer = "P7D"
+
+[dependency-groups]
+dev = [
+    "ruff>=0.15.15",
+]
