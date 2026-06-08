@@ -16,6 +16,11 @@ class DemoServerConfig(ServerConfig):
 
 
 @dataclass(frozen=True)
+class LocalServerConfig(ServerConfig):
+    kind: Literal["local"] = "local"
+
+
+@dataclass(frozen=True)
 class AppConfig:
     server: ServerConfig
     refresh_seconds: int
@@ -36,5 +41,8 @@ def load_config(path: Path) -> AppConfig:
 def _load_server_config(server: dict[str, object], kind: str) -> ServerConfig:
     if kind == "demo":
         return DemoServerConfig(name=str(server["name"]))
+
+    if kind == "local":
+        return LocalServerConfig(name=str(server["name"]))
 
     raise ValueError(f"Unsupported server kind: {kind}")
