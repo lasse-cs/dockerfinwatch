@@ -1,0 +1,6 @@
+[defaults]
+refresh_seconds = 60
+
+[server]
+name = "demo-server"
+kind = "demo"
