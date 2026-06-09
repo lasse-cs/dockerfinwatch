@@ -13,7 +13,7 @@ from dockerfinwatch.docker import (
 )
 from dockerfinwatch.monitor import MonitorService
 from dockerfinwatch.runner_factory import create_command_runner
-from dockerfinwatch.ui import DockerClusterMonitorApp
+from dockerfinwatch.ui import DockerFinWatchApp
 
 
 CONFIG_ENV_VAR = "DOCKERFINWATCH_CONFIG"
@@ -25,7 +25,7 @@ CommandRunnerFactory = Callable[[ServerConfig], CommandRunner]
 def create_app(
     config_path: Path,
     command_runner_factory: CommandRunnerFactory = create_command_runner,
-) -> DockerClusterMonitorApp:
+) -> DockerFinWatchApp:
     return create_app_from_config(load_config(config_path), command_runner_factory)
 
 
@@ -89,7 +89,7 @@ def _expand_user(path: Path, home: Path | None) -> Path:
 def create_app_from_config(
     config: AppConfig,
     command_runner_factory: CommandRunnerFactory = create_command_runner,
-) -> DockerClusterMonitorApp:
+) -> DockerFinWatchApp:
     monitors = []
     for server in config.servers:
         stack = ExitStack()
@@ -100,7 +100,7 @@ def create_app_from_config(
         )
         monitors.append(MonitorService(server.name, docker_query, cleanup=stack.close))
 
-    return DockerClusterMonitorApp(monitors, config.refresh_seconds)
+    return DockerFinWatchApp(monitors, config.refresh_seconds)
 
 
 def main(argv: list[str] | None = None) -> None:

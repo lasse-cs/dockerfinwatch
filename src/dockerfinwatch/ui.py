@@ -120,12 +120,13 @@ class ServerMonitorView(Vertical):
                 for container in snapshot.containers
             )
         )
+        local_time = snapshot.updated_at.astimezone()
         self._show_status(
-            f"{snapshot.server_name} | last updated {snapshot.updated_at:%H:%M:%S %Z}"
+            f"{snapshot.server_name} | last updated {local_time:%H:%M:%S %Z}"
         )
 
 
-class DockerClusterMonitorApp(App[None]):
+class DockerFinWatchApp(App[None]):
     CSS_PATH = "ui.tcss"
 
     BINDINGS = [

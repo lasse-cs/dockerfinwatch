@@ -8,7 +8,7 @@ from textual.widgets import DataTable, Static
 
 from dockerfinwatch.docker import Container, ContainerMetadata, ContainerStats
 from dockerfinwatch.monitor import MonitorRefreshError, MonitorSnapshot
-from dockerfinwatch.ui import DockerClusterMonitorApp
+from dockerfinwatch.ui import DockerFinWatchApp
 from helpers import wait_until
 
 
@@ -82,6 +82,10 @@ class SequenceMonitorService:
         pass
 
 
+def _local_time_str(dt: datetime) -> str:
+    return dt.astimezone().strftime("%H:%M:%S %Z")
+
+
 def snapshot_with_container(name: str, server_name: str = "prod") -> MonitorSnapshot:
     return MonitorSnapshot(
         server_name=server_name,
@@ -125,17 +129,18 @@ async def test_app_displays_monitor_snapshot_in_table() -> None:
             updated_at=datetime(2026, 6, 8, 12, 30, tzinfo=UTC),
         )
     )
-    app = DockerClusterMonitorApp([monitor])
+    app = DockerFinWatchApp([monitor])
 
     async with app.run_test() as pilot:
         await pilot.pause()
 
         status = app.query_one("#server-status-0", Static)
         table = app.query_one("#containers-0", DataTable)
-        await wait_until(lambda: status.content == "prod | last updated 12:30:00 UTC")
+        expected_time = _local_time_str(datetime(2026, 6, 8, 12, 30, tzinfo=UTC))
+        await wait_until(lambda: status.content == f"prod | last updated {expected_time}")
 
         assert monitor.refresh_count == 1
-        assert status.content == "prod | last updated 12:30:00 UTC"
+        assert status.content == f"prod | last updated {expected_time}"
         assert table.row_count == 1
         assert table.get_cell_at(Coordinate(0, 0)) == "web"
         assert table.get_cell_at(Coordinate(0, 1)) == "nginx:latest"
@@ -156,7 +161,7 @@ async def test_app_displays_monitor_snapshot_in_table() -> None:
 async def test_app_displays_one_table_per_monitor() -> None:
     first_monitor = FakeMonitorService(snapshot_with_container("web", "prod-a"))
     second_monitor = FakeMonitorService(snapshot_with_container("api", "prod-b"))
-    app = DockerClusterMonitorApp([first_monitor, second_monitor])
+    app = DockerFinWatchApp([first_monitor, second_monitor])
 
     async with app.run_test() as pilot:
         await pilot.pause()
@@ -169,8 +174,9 @@ async def test_app_displays_one_table_per_monitor() -> None:
             lambda: first_table.row_count == 1 and second_table.row_count == 1
         )
 
-        assert first_status.content == "prod-a | last updated 12:30:00 UTC"
-        assert second_status.content == "prod-b | last updated 12:30:00 UTC"
+        expected_time = _local_time_str(datetime(2026, 6, 8, 12, 30, tzinfo=UTC))
+        assert first_status.content == f"prod-a | last updated {expected_time}"
+        assert second_status.content == f"prod-b | last updated {expected_time}"
         assert first_table.get_cell_at(Coordinate(0, 0)) == "web"
         assert second_table.get_cell_at(Coordinate(0, 0)) == "api"
 
@@ -181,7 +187,7 @@ async def test_app_displays_one_table_per_monitor() -> None:
 @pytest.mark.asyncio
 async def test_app_refreshes_on_configured_interval() -> None:
     monitor = FakeMonitorService(snapshot_with_container("web"))
-    app = DockerClusterMonitorApp([monitor], refresh_seconds=0.05)
+    app = DockerFinWatchApp([monitor], refresh_seconds=0.05)
 
     async with app.run_test() as pilot:
         await pilot.pause()
@@ -195,7 +201,7 @@ async def test_app_refreshes_on_configured_interval() -> None:
 async def test_app_runs_refresh_in_worker_thread() -> None:
     main_thread_id = threading.get_ident()
     monitor = BlockingMonitorService(snapshot_with_container("web"))
-    app = DockerClusterMonitorApp([monitor])
+    app = DockerFinWatchApp([monitor])
 
     async with app.run_test() as pilot:
         await pilot.pause()
@@ -210,14 +216,15 @@ async def test_app_runs_refresh_in_worker_thread() -> None:
         assert monitor.refresh_count == 1
 
         monitor.release.set()
-        await wait_until(lambda: status.content == "prod | last updated 12:30:00 UTC")
+        expected_time = _local_time_str(datetime(2026, 6, 8, 12, 30, tzinfo=UTC))
+        await wait_until(lambda: status.content == f"prod | last updated {expected_time}")
 
 
 @pytest.mark.asyncio
 async def test_app_refreshes_servers_independently() -> None:
     slow_monitor = BlockingMonitorService(snapshot_with_container("web", "slow"))
     fast_monitor = FakeMonitorService(snapshot_with_container("api", "fast"))
-    app = DockerClusterMonitorApp([slow_monitor, fast_monitor])
+    app = DockerFinWatchApp([slow_monitor, fast_monitor])
 
     async with app.run_test() as pilot:
         await pilot.pause()
@@ -237,7 +244,7 @@ async def test_app_refreshes_servers_independently() -> None:
 
 @pytest.mark.asyncio
 async def test_app_shows_status_when_docker_ps_refresh_fails() -> None:
-    app = DockerClusterMonitorApp([FailingMonitorService()])
+    app = DockerFinWatchApp([FailingMonitorService()])
 
     async with app.run_test() as pilot:
         await pilot.pause()
@@ -254,7 +261,7 @@ async def test_app_shows_status_when_docker_ps_refresh_fails() -> None:
 
 @pytest.mark.asyncio
 async def test_app_preserves_table_when_manual_refresh_fails() -> None:
-    app = DockerClusterMonitorApp(
+    app = DockerFinWatchApp(
         [
             SequenceMonitorService(
                 [
