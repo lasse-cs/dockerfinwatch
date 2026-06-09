@@ -37,10 +37,15 @@ class ServerMonitorView(Vertical):
             id=f"server-status-{self._index}",
             classes="server-status",
         )
-        yield DataTable(
+        table = DataTable(
+            show_row_labels=False,
+            zebra_stripes=True,
+            cursor_type="row",
             id=f"containers-{self._index}",
             classes="server-containers",
         )
+        table.loading = True
+        yield table
 
     def on_mount(self) -> None:
         table = self.query_one(f"#containers-{self._index}", DataTable)
@@ -69,7 +74,7 @@ class ServerMonitorView(Vertical):
             return
 
         self._refresh_in_progress = True
-        self._show_status(f"{self._monitor.server_name} | refreshing...")
+        self._show_status(f"{self._monitor.server_name} | refreshing...", "refreshing")
         self._refresh_in_background()
 
     @work(thread=True)
@@ -85,7 +90,8 @@ class ServerMonitorView(Vertical):
 
     def _complete_refresh_error(self, message: str) -> None:
         self._refresh_in_progress = False
-        self._show_status(f"{self._monitor.server_name} | {message}")
+        self._finish_loading()
+        self._show_status(f"{self._monitor.server_name} | {message}", "error")
 
     def _complete_refresh_success(self, snapshot: MonitorSnapshot) -> None:
         self._refresh_in_progress = False
@@ -94,12 +100,21 @@ class ServerMonitorView(Vertical):
     def _raise_fatal(self, error: Exception) -> None:
         raise error
 
-    def _show_status(self, message: str) -> None:
+    def _show_status(self, message: str, state: str | None = None) -> None:
         status = self.query_one(f"#server-status-{self._index}", Static)
+        self.remove_class("is-ready", "is-refreshing", "is-error")
+        status.remove_class("is-ready", "is-refreshing", "is-error")
+
+        if state is not None:
+            class_name = f"is-{state}"
+            self.add_class(class_name)
+            status.add_class(class_name)
+
         status.update(message)
 
     def _show_snapshot(self, snapshot: MonitorSnapshot) -> None:
         table = self.query_one(f"#containers-{self._index}", DataTable)
+        self._finish_loading()
 
         table.clear()
         table.add_rows(
@@ -122,11 +137,17 @@ class ServerMonitorView(Vertical):
         )
         local_time = snapshot.updated_at.astimezone()
         self._show_status(
-            f"{snapshot.server_name} | last updated {local_time:%H:%M:%S %Z}"
+            f"{snapshot.server_name} | last updated {local_time:%H:%M:%S %Z}",
+            "ready",
         )
+
+    def _finish_loading(self) -> None:
+        table = self.query_one(f"#containers-{self._index}", DataTable)
+        table.loading = False
 
 
 class DockerFinWatchApp(App[None]):
+    TITLE = "Docker Fin Watch"
     CSS_PATH = "ui.tcss"
 
     BINDINGS = [

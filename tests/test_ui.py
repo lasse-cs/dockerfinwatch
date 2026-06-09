@@ -221,6 +221,25 @@ async def test_app_runs_refresh_in_worker_thread() -> None:
 
 
 @pytest.mark.asyncio
+async def test_app_marks_table_loading_during_initial_refresh() -> None:
+    monitor = BlockingMonitorService(snapshot_with_container("web"))
+    app = DockerFinWatchApp([monitor])
+
+    async with app.run_test() as pilot:
+        await pilot.pause()
+
+        table = app.query_one("#containers-0", DataTable)
+
+        assert await asyncio.to_thread(monitor.started.wait, 1)
+        assert table.loading is True
+
+        monitor.release.set()
+        await wait_until(lambda: table.row_count == 1)
+
+        assert table.loading is False
+
+
+@pytest.mark.asyncio
 async def test_app_refreshes_servers_independently() -> None:
     slow_monitor = BlockingMonitorService(snapshot_with_container("web", "slow"))
     fast_monitor = FakeMonitorService(snapshot_with_container("api", "fast"))

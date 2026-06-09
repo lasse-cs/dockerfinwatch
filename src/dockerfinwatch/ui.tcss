@@ -1,28 +1,106 @@
 Screen {
     layout: vertical;
+    background: $surface;
+    color: $text;
+}
+
+Header {
+    background: $panel;
+    color: $text;
+    text-style: bold;
+}
+
+Footer {
+    background: $panel;
+    color: $text-muted;
 }
 
 #status {
-    background: $panel;
+    background: $boost;
+    color: $text-muted;
     height: 1;
-    padding: 0 1;
+    padding: 0 2;
+    text-style: bold;
 }
 
 #servers {
     height: 1fr;
+    padding: 1 2 0 2;
 }
 
 .server-view {
+    background: $panel;
+    border: round $boost;
     height: auto;
     margin: 0 0 1 0;
+    padding: 0 1 1 1;
+}
+
+.server-view.is-ready {
+    border: round $primary;
+}
+
+.server-view.is-refreshing {
+    border: round $warning;
+}
+
+.server-view.is-error {
+    border: round $error;
 }
 
 .server-status {
     background: $panel;
+    color: $text-muted;
     height: 1;
     padding: 0 1;
+    text-style: bold;
+}
+
+.server-status.is-ready {
+    color: $success;
+}
+
+.server-status.is-refreshing {
+    color: $warning;
+}
+
+.server-status.is-error {
+    color: $error;
 }
 
 .server-containers {
+    background: $surface;
+    border: tall $boost;
+    color: $text;
     height: auto;
+}
+
+.server-containers > .datatable--header {
+    background: $boost;
+    color: $primary;
+    text-style: bold;
+}
+
+.server-containers > .datatable--even-row {
+    background: $surface;
+}
+
+.server-containers > .datatable--odd-row {
+    background: $panel;
+}
+
+.server-containers > .datatable--hover {
+    background: $boost;
+}
+
+.server-containers > .datatable--cursor {
+    background: $primary;
+    color: $text;
+    text-style: bold;
+}
+
+.server-containers > .datatable--header-cursor {
+    background: $secondary;
+    color: $text;
+    text-style: bold;
 }
