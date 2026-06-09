@@ -1,6 +1,6 @@
 [defaults]
 refresh_seconds = 60
 
-[server]
+[[servers]]
 name = "demo-server"
 kind = "demo"
