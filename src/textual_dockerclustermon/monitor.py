@@ -17,7 +17,7 @@ class MonitorRefreshError(Exception):
     pass
 
 
-class DockerPsQuery(Protocol):
+class DockerQuery(Protocol):
     def fetch(self) -> list[Container]: ...
 
 
@@ -29,7 +29,7 @@ class MonitorService:
     def __init__(
         self,
         server_name: str,
-        docker_ps_query: DockerPsQuery,
+        docker_ps_query: DockerQuery,
         clock: Callable[[], datetime] = utc_now,
     ) -> None:
         self._server_name = server_name
