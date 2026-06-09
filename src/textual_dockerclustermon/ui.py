@@ -54,9 +54,10 @@ class DockerClusterMonitorApp(App[None]):
             snapshot = self._monitor.refresh()
         except MonitorRefreshError as error:
             self.call_from_thread(self._complete_refresh_error, str(error))
-            return
-
-        self.call_from_thread(self._complete_refresh_success, snapshot)
+        except Exception as error:
+            self.call_from_thread(self._raise_fatal, error)
+        else:
+            self.call_from_thread(self._complete_refresh_success, snapshot)
 
     def _complete_refresh_error(self, message: str) -> None:
         self._refresh_in_progress = False
@@ -65,6 +66,9 @@ class DockerClusterMonitorApp(App[None]):
     def _complete_refresh_success(self, snapshot: MonitorSnapshot) -> None:
         self._refresh_in_progress = False
         self._show_snapshot(snapshot)
+
+    def _raise_fatal(self, error: Exception) -> None:
+        raise error
 
     def _show_status(self, message: str) -> None:
         status = self.query_one("#status", Static)
