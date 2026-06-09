@@ -19,9 +19,10 @@ class DockerClusterMonitorApp(App[None]):
         ("q", "quit", "Quit"),
     ]
 
-    def __init__(self, monitor: Monitor) -> None:
+    def __init__(self, monitor: Monitor, refresh_seconds: float = 60) -> None:
         super().__init__()
         self._monitor = monitor
+        self._refresh_seconds = refresh_seconds
         self._refresh_in_progress = False
 
     def compose(self) -> ComposeResult:
@@ -33,6 +34,7 @@ class DockerClusterMonitorApp(App[None]):
     def on_mount(self) -> None:
         table = self.query_one("#containers", DataTable)
         table.add_columns("Name", "Image", "Status", "Ports", "ID")
+        self.set_interval(self._refresh_seconds, self._refresh)
         self._refresh()
 
     def action_refresh(self) -> None:

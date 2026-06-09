@@ -107,6 +107,19 @@ async def test_app_displays_monitor_snapshot_in_table() -> None:
 
 
 @pytest.mark.asyncio
+async def test_app_refreshes_on_configured_interval() -> None:
+    monitor = FakeMonitorService(snapshot_with_container("web"))
+    app = DockerClusterMonitorApp(monitor, refresh_seconds=0.05)
+
+    async with app.run_test() as pilot:
+        await pilot.pause()
+
+        await wait_until(lambda: monitor.refresh_count >= 2)
+
+        assert monitor.refresh_count >= 2
+
+
+@pytest.mark.asyncio
 async def test_app_runs_refresh_in_worker_thread() -> None:
     main_thread_id = threading.get_ident()
     monitor = BlockingMonitorService(snapshot_with_container("web"))
