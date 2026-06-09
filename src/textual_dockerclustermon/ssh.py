@@ -70,9 +70,7 @@ class ParamikoSSHClient:
 
 class SSHCommandRunner:
     def __init__(
-        self,
-        config: SSHServerConfig,
-        client_factory: Callable[[], SSHClient]
+        self, config: SSHServerConfig, client_factory: Callable[[], SSHClient]
     ) -> None:
         self._config = config
         self._client_factory = client_factory

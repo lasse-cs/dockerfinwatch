@@ -12,6 +12,15 @@ class SequenceCommandRunner:
         self._container_names = container_names
 
     def run(self, command: str, timeout_seconds: int) -> CommandResult:
+        if command.startswith("docker stats"):
+            return CommandResult(
+                stdout=(
+                    '{"ID":"abc123","CPUPerc":"1.23%","MemUsage":"10MiB / 1GiB","MemPerc":"0.98%","NetIO":"1kB / 2kB","BlockIO":"0B / 0B","PIDs":"4"}\n'
+                ),
+                stderr="",
+                exit_code=0,
+            )
+
         name = self._container_names.pop(0) if self._container_names else "api"
         return CommandResult(
             stdout=(
@@ -48,6 +57,7 @@ kind = "demo"
         assert table.row_count == 2
         assert table.get_cell_at(Coordinate(0, 0)) == "web"
         assert table.get_cell_at(Coordinate(1, 0)) == "cache"
+        assert table.get_cell_at(Coordinate(0, 3)) == "1.23%"
 
 
 @pytest.mark.asyncio
@@ -73,6 +83,7 @@ kind = "demo"
 
         table = app.query_one("#containers", DataTable)
         await wait_until(
-            lambda: table.row_count == 1
-            and table.get_cell_at(Coordinate(0, 0)) == "api"
+            lambda: (
+                table.row_count == 1 and table.get_cell_at(Coordinate(0, 0)) == "api"
+            )
         )

@@ -6,7 +6,7 @@ import pytest
 from textual.coordinate import Coordinate
 from textual.widgets import DataTable, Static
 
-from textual_dockerclustermon.docker import Container
+from textual_dockerclustermon.docker import Container, ContainerMetadata, ContainerStats
 from textual_dockerclustermon.monitor import MonitorRefreshError, MonitorSnapshot
 from textual_dockerclustermon.ui import DockerClusterMonitorApp
 from helpers import wait_until
@@ -58,15 +58,33 @@ def snapshot_with_container(name: str) -> MonitorSnapshot:
     return MonitorSnapshot(
         server_name="prod",
         containers=[
-            Container(
-                id="abc123",
-                name=name,
-                image="nginx:latest",
-                status="Up 2 minutes",
-                ports="80/tcp",
-            )
+            container(name=name),
         ],
         updated_at=datetime(2026, 6, 8, 12, 30, tzinfo=UTC),
+    )
+
+
+def container(name: str = "web", stats: ContainerStats | None = None) -> Container:
+    return Container(
+        metadata=ContainerMetadata(
+            id="abc123",
+            name=name,
+            image="nginx:latest",
+            status="Up 2 minutes",
+            ports="80/tcp",
+        ),
+        stats=stats,
+    )
+
+
+def container_stats() -> ContainerStats:
+    return ContainerStats(
+        cpu_percent="1.23%",
+        memory_usage="10MiB / 1GiB",
+        memory_percent="0.98%",
+        network_io="1kB / 2kB",
+        block_io="0B / 0B",
+        pids="4",
     )
 
 
@@ -75,15 +93,7 @@ async def test_app_displays_monitor_snapshot_in_table() -> None:
     monitor = FakeMonitorService(
         MonitorSnapshot(
             server_name="prod",
-            containers=[
-                Container(
-                    id="abc123",
-                    name="web",
-                    image="nginx:latest",
-                    status="Up 2 minutes",
-                    ports="80/tcp",
-                )
-            ],
+            containers=[container(stats=container_stats())],
             updated_at=datetime(2026, 6, 8, 12, 30, tzinfo=UTC),
         )
     )
@@ -102,8 +112,14 @@ async def test_app_displays_monitor_snapshot_in_table() -> None:
         assert table.get_cell_at(Coordinate(0, 0)) == "web"
         assert table.get_cell_at(Coordinate(0, 1)) == "nginx:latest"
         assert table.get_cell_at(Coordinate(0, 2)) == "Up 2 minutes"
-        assert table.get_cell_at(Coordinate(0, 3)) == "80/tcp"
-        assert table.get_cell_at(Coordinate(0, 4)) == "abc123"
+        assert table.get_cell_at(Coordinate(0, 3)) == "1.23%"
+        assert table.get_cell_at(Coordinate(0, 4)) == "10MiB / 1GiB"
+        assert table.get_cell_at(Coordinate(0, 5)) == "0.98%"
+        assert table.get_cell_at(Coordinate(0, 6)) == "1kB / 2kB"
+        assert table.get_cell_at(Coordinate(0, 7)) == "0B / 0B"
+        assert table.get_cell_at(Coordinate(0, 8)) == "4"
+        assert table.get_cell_at(Coordinate(0, 9)) == "80/tcp"
+        assert table.get_cell_at(Coordinate(0, 10)) == "abc123"
 
 
 @pytest.mark.asyncio

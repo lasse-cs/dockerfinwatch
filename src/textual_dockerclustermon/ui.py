@@ -33,7 +33,19 @@ class DockerClusterMonitorApp(App[None]):
 
     def on_mount(self) -> None:
         table = self.query_one("#containers", DataTable)
-        table.add_columns("Name", "Image", "Status", "Ports", "ID")
+        table.add_columns(
+            "Name",
+            "Image",
+            "Status",
+            "CPU",
+            "Memory",
+            "Mem %",
+            "Net I/O",
+            "Block I/O",
+            "PIDs",
+            "Ports",
+            "ID",
+        )
         self.set_interval(self._refresh_seconds, self._refresh)
         self._refresh()
 
@@ -82,11 +94,17 @@ class DockerClusterMonitorApp(App[None]):
         table.add_rows(
             (
                 (
-                    container.name,
-                    container.image,
-                    container.status,
-                    container.ports,
-                    container.id,
+                    container.metadata.name,
+                    container.metadata.image,
+                    container.metadata.status,
+                    container.stats.cpu_percent if container.stats else "-",
+                    container.stats.memory_usage if container.stats else "-",
+                    container.stats.memory_percent if container.stats else "-",
+                    container.stats.network_io if container.stats else "-",
+                    container.stats.block_io if container.stats else "-",
+                    container.stats.pids if container.stats else "-",
+                    container.metadata.ports,
+                    container.metadata.id,
                 )
                 for container in snapshot.containers
             )

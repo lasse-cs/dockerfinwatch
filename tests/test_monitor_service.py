@@ -2,7 +2,7 @@ from datetime import UTC, datetime
 
 import pytest
 
-from textual_dockerclustermon.docker import Container, DockerPsError
+from textual_dockerclustermon.docker import Container, ContainerMetadata, DockerPsError
 from textual_dockerclustermon.monitor import MonitorRefreshError, MonitorService
 
 
@@ -24,11 +24,14 @@ class FailingDockerPsQuery:
 def test_monitor_service_returns_server_snapshot() -> None:
     containers = [
         Container(
-            id="abc123",
-            name="web",
-            image="nginx:latest",
-            status="Up 2 minutes",
-            ports="80/tcp",
+            metadata=ContainerMetadata(
+                id="abc123",
+                name="web",
+                image="nginx:latest",
+                status="Up 2 minutes",
+                ports="80/tcp",
+            ),
+            stats=None,
         )
     ]
     query = FakeDockerPsQuery(containers)
@@ -36,7 +39,7 @@ def test_monitor_service_returns_server_snapshot() -> None:
 
     snapshot = MonitorService(
         server_name="prod",
-        docker_ps_query=query,
+        docker_query=query,
         clock=lambda: updated_at,
     ).refresh()
 
@@ -50,8 +53,8 @@ def test_monitor_service_wraps_docker_ps_errors() -> None:
     with pytest.raises(MonitorRefreshError) as error:
         MonitorService(
             server_name="prod",
-            docker_ps_query=FailingDockerPsQuery(),
+            docker_query=FailingDockerPsQuery(),
         ).refresh()
 
-    assert str(error.value) == "docker ps failed: permission denied"
+    assert str(error.value) == "docker query failed: permission denied"
     assert isinstance(error.value.__cause__, DockerPsError)

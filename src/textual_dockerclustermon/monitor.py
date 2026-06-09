@@ -3,7 +3,7 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import Protocol
 
-from textual_dockerclustermon.docker import Container, DockerPsError
+from textual_dockerclustermon.docker import Container, DockerQueryError
 
 
 @dataclass(frozen=True)
@@ -29,18 +29,18 @@ class MonitorService:
     def __init__(
         self,
         server_name: str,
-        docker_ps_query: DockerQuery,
+        docker_query: DockerQuery,
         clock: Callable[[], datetime] = utc_now,
     ) -> None:
         self._server_name = server_name
-        self._docker_ps_query = docker_ps_query
+        self._docker_query = docker_query
         self._clock = clock
 
     def refresh(self) -> MonitorSnapshot:
         try:
-            containers = self._docker_ps_query.fetch()
-        except DockerPsError as error:
-            raise MonitorRefreshError(f"docker ps failed: {error}") from error
+            containers = self._docker_query.fetch()
+        except DockerQueryError as error:
+            raise MonitorRefreshError(f"docker query failed: {error}") from error
 
         return MonitorSnapshot(
             server_name=self._server_name,

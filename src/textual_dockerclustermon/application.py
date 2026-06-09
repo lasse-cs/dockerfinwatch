@@ -3,7 +3,11 @@ from pathlib import Path
 
 from textual_dockerclustermon.commands import CommandRunner
 from textual_dockerclustermon.config import AppConfig, ServerConfig, load_config
-from textual_dockerclustermon.docker import DockerPsQuery
+from textual_dockerclustermon.docker import (
+    DockerContainerQuery,
+    DockerPsQuery,
+    DockerStatsQuery,
+)
 from textual_dockerclustermon.monitor import MonitorService
 from textual_dockerclustermon.runner_factory import create_command_runner
 from textual_dockerclustermon.ui import DockerClusterMonitorApp
@@ -25,8 +29,11 @@ def create_app_from_config(
     command_runner_factory: CommandRunnerFactory = create_command_runner,
 ) -> DockerClusterMonitorApp:
     runner = command_runner_factory(config.server)
-    docker_ps_query = DockerPsQuery(runner)
-    monitor = MonitorService(config.server.name, docker_ps_query)
+    docker_query = DockerContainerQuery(
+        DockerPsQuery(runner),
+        [DockerStatsQuery(runner)],
+    )
+    monitor = MonitorService(config.server.name, docker_query)
     return DockerClusterMonitorApp(monitor, config.refresh_seconds)
 
 
