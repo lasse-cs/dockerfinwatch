@@ -2,16 +2,16 @@ from dataclasses import dataclass
 
 import pytest
 
-from textual_dockerclustermon.config import (
+from dockerfinwatch.config import (
     DemoServerConfig,
     LocalServerConfig,
     ServerConfig,
     SSHServerConfig,
 )
-from textual_dockerclustermon.demo import DemoCommandRunner
-from textual_dockerclustermon.local import LocalCommandRunner
-from textual_dockerclustermon.runner_factory import create_command_runner
-from textual_dockerclustermon.ssh import SSHCommandRunner
+from dockerfinwatch.demo import DemoCommandRunner
+from dockerfinwatch.local import LocalCommandRunner
+from dockerfinwatch.runner_factory import create_command_runner
+from dockerfinwatch.ssh import SSHCommandRunner
 
 
 @dataclass(frozen=True)

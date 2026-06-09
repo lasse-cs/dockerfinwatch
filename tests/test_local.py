@@ -3,12 +3,12 @@ from collections.abc import Sequence
 
 import pytest
 
-from textual_dockerclustermon.commands import (
+from dockerfinwatch.commands import (
     CommandConnectionError,
     CommandResult,
     CommandTimeoutError,
 )
-from textual_dockerclustermon.local import LocalCommandRunner
+from dockerfinwatch.local import LocalCommandRunner
 
 
 class FakeProcessRunner:

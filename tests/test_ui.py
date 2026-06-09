@@ -6,9 +6,9 @@ import pytest
 from textual.coordinate import Coordinate
 from textual.widgets import DataTable, Static
 
-from textual_dockerclustermon.docker import Container, ContainerMetadata, ContainerStats
-from textual_dockerclustermon.monitor import MonitorRefreshError, MonitorSnapshot
-from textual_dockerclustermon.ui import DockerClusterMonitorApp
+from dockerfinwatch.docker import Container, ContainerMetadata, ContainerStats
+from dockerfinwatch.monitor import MonitorRefreshError, MonitorSnapshot
+from dockerfinwatch.ui import DockerClusterMonitorApp
 from helpers import wait_until
 
 

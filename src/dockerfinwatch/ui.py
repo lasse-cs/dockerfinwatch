@@ -5,7 +5,7 @@ from textual.app import App, ComposeResult
 from textual.containers import Vertical, VerticalScroll
 from textual.widgets import DataTable, Footer, Header, Static
 
-from textual_dockerclustermon.monitor import MonitorRefreshError, MonitorSnapshot
+from dockerfinwatch.monitor import MonitorRefreshError, MonitorSnapshot
 
 
 class Monitor(Protocol):

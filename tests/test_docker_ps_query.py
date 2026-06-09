@@ -4,8 +4,8 @@ from typing import Self
 
 import pytest
 
-from textual_dockerclustermon.commands import CommandConnectionError, CommandResult
-from textual_dockerclustermon.docker import (
+from dockerfinwatch.commands import CommandConnectionError, CommandResult
+from dockerfinwatch.docker import (
     DockerContainerQuery,
     DockerPsError,
     DockerPsQuery,

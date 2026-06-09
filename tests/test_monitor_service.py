@@ -2,8 +2,8 @@ from datetime import UTC, datetime
 
 import pytest
 
-from textual_dockerclustermon.docker import Container, ContainerMetadata, DockerPsError
-from textual_dockerclustermon.monitor import MonitorRefreshError, MonitorService
+from dockerfinwatch.docker import Container, ContainerMetadata, DockerPsError
+from dockerfinwatch.monitor import MonitorRefreshError, MonitorService
 
 
 class FakeDockerPsQuery:

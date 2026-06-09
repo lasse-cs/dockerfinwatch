@@ -1,6 +1,6 @@
 import pytest
 
-from textual_dockerclustermon.config import (
+from dockerfinwatch.config import (
     DemoServerConfig,
     LocalServerConfig,
     SSHServerConfig,
@@ -9,7 +9,7 @@ from textual_dockerclustermon.config import (
 
 
 def test_load_config_reads_demo_server_from_toml(tmp_path) -> None:
-    config_path = tmp_path / "dockerclustermon.toml"
+    config_path = tmp_path / "dockerfinwatch.toml"
     config_path.write_text(
         """
 [[servers]]
@@ -29,7 +29,7 @@ kind = "demo"
 
 
 def test_load_config_reads_multiple_servers_from_toml(tmp_path) -> None:
-    config_path = tmp_path / "dockerclustermon.toml"
+    config_path = tmp_path / "dockerfinwatch.toml"
     config_path.write_text(
         """
 [[servers]]
@@ -56,7 +56,7 @@ username = "deploy"
 
 
 def test_load_config_reads_refresh_seconds_default(tmp_path) -> None:
-    config_path = tmp_path / "dockerclustermon.toml"
+    config_path = tmp_path / "dockerfinwatch.toml"
     config_path.write_text(
         """
 [defaults]
@@ -75,7 +75,7 @@ kind = "demo"
 
 
 def test_load_config_reads_fractional_refresh_seconds_default(tmp_path) -> None:
-    config_path = tmp_path / "dockerclustermon.toml"
+    config_path = tmp_path / "dockerfinwatch.toml"
     config_path.write_text(
         """
 [defaults]
@@ -94,7 +94,7 @@ kind = "demo"
 
 
 def test_load_config_reads_local_server_from_toml(tmp_path) -> None:
-    config_path = tmp_path / "dockerclustermon.toml"
+    config_path = tmp_path / "dockerfinwatch.toml"
     config_path.write_text(
         """
 [[servers]]
@@ -112,7 +112,7 @@ kind = "local"
 
 
 def test_load_config_reads_ssh_server_from_toml(tmp_path) -> None:
-    config_path = tmp_path / "dockerclustermon.toml"
+    config_path = tmp_path / "dockerfinwatch.toml"
     config_path.write_text(
         """
 [[servers]]
@@ -139,7 +139,7 @@ key_filename = "/home/me/.ssh/id_ed25519"
 
 
 def test_load_config_defaults_ssh_optional_fields(tmp_path) -> None:
-    config_path = tmp_path / "dockerclustermon.toml"
+    config_path = tmp_path / "dockerfinwatch.toml"
     config_path.write_text(
         """
 [[servers]]
@@ -160,7 +160,7 @@ host = "prod.example.com"
 
 
 def test_load_config_reads_ssh_config_file_default(tmp_path) -> None:
-    config_path = tmp_path / "dockerclustermon.toml"
+    config_path = tmp_path / "dockerfinwatch.toml"
     ssh_config_path = tmp_path / "ssh_config"
     config_path.write_text(
         f"""
@@ -182,7 +182,7 @@ host = "prod.example.com"
 
 
 def test_load_config_can_disable_ssh_config_file(tmp_path) -> None:
-    config_path = tmp_path / "dockerclustermon.toml"
+    config_path = tmp_path / "dockerfinwatch.toml"
     config_path.write_text(
         """
 [defaults]
@@ -203,7 +203,7 @@ host = "prod.example.com"
 
 
 def test_load_config_rejects_unknown_server_kind(tmp_path) -> None:
-    config_path = tmp_path / "dockerclustermon.toml"
+    config_path = tmp_path / "dockerfinwatch.toml"
     config_path.write_text(
         """
 [[servers]]

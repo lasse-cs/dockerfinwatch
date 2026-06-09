@@ -1,10 +1,10 @@
 import paramiko
 
-from textual_dockerclustermon.commands import CommandRunner
-from textual_dockerclustermon.config import ServerConfig, SSHServerConfig
-from textual_dockerclustermon.demo import DemoCommandRunner
-from textual_dockerclustermon.local import LocalCommandRunner, SubprocessProcessRunner
-from textual_dockerclustermon.ssh import ParamikoSSHClient, SSHCommandRunner
+from dockerfinwatch.commands import CommandRunner
+from dockerfinwatch.config import ServerConfig, SSHServerConfig
+from dockerfinwatch.demo import DemoCommandRunner
+from dockerfinwatch.local import LocalCommandRunner, SubprocessProcessRunner
+from dockerfinwatch.ssh import ParamikoSSHClient, SSHCommandRunner
 
 
 def create_command_runner(server: ServerConfig) -> CommandRunner:

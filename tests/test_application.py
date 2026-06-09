@@ -8,13 +8,13 @@ from textual.coordinate import Coordinate
 from textual.widgets import DataTable, Static
 
 from helpers import wait_until
-from textual_dockerclustermon.application import (
+from dockerfinwatch.application import (
     CONFIG_ENV_VAR,
     config_path_from_args,
     create_app,
     resolve_config_path,
 )
-from textual_dockerclustermon.commands import CommandResult
+from dockerfinwatch.commands import CommandResult
 
 
 class SequenceCommandRunner:
@@ -57,7 +57,7 @@ class SequenceCommandRunner:
 def test_resolve_config_path_uses_explicit_path() -> None:
     assert resolve_config_path(
         Path("~/custom.toml"),
-        environ={CONFIG_ENV_VAR: "/env/dockerclustermon.toml", "XDG_CONFIG_HOME": "/xdg"},
+        environ={CONFIG_ENV_VAR: "/env/dockerfinwatch.toml", "XDG_CONFIG_HOME": "/xdg"},
         home=Path("/home/test-user"),
     ) == Path("/home/test-user/custom.toml")
 
@@ -71,13 +71,13 @@ def test_resolve_config_path_uses_environment_path() -> None:
 
 def test_resolve_config_path_uses_xdg_config_home() -> None:
     assert resolve_config_path(environ={"XDG_CONFIG_HOME": "/xdg"}) == Path(
-        "/xdg/dockerclustermon/dockerclustermon.toml"
+        "/xdg/dockerfinwatch/config.toml"
     )
 
 
 def test_resolve_config_path_uses_home_config_fallback() -> None:
     assert resolve_config_path(environ={}, home=Path("/home/test-user")) == Path(
-        "/home/test-user/.config/dockerclustermon/dockerclustermon.toml"
+        "/home/test-user/.config/dockerfinwatch/config.toml"
     )
 
 
@@ -89,7 +89,7 @@ def test_config_path_from_args_uses_config_option(tmp_path) -> None:
 
 @pytest.mark.asyncio
 async def test_create_app_wires_demo_server_from_config(tmp_path) -> None:
-    config_path = tmp_path / "dockerclustermon.toml"
+    config_path = tmp_path / "dockerfinwatch.toml"
     config_path.write_text(
         """
 [[servers]]
@@ -117,7 +117,7 @@ kind = "demo"
 
 @pytest.mark.asyncio
 async def test_create_app_wires_multiple_servers_from_config(tmp_path) -> None:
-    config_path = tmp_path / "dockerclustermon.toml"
+    config_path = tmp_path / "dockerfinwatch.toml"
     config_path.write_text(
         """
 [[servers]]
@@ -152,7 +152,7 @@ kind = "demo"
 
 @pytest.mark.asyncio
 async def test_create_app_uses_configured_refresh_interval(tmp_path) -> None:
-    config_path = tmp_path / "dockerclustermon.toml"
+    config_path = tmp_path / "dockerfinwatch.toml"
     config_path.write_text(
         """
 [defaults]

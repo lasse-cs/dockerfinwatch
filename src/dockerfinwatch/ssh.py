@@ -7,12 +7,12 @@ from typing import Protocol, Self
 
 import paramiko
 
-from textual_dockerclustermon.commands import (
+from dockerfinwatch.commands import (
     CommandConnectionError,
     CommandResult,
     CommandTimeoutError,
 )
-from textual_dockerclustermon.config import SSHServerConfig
+from dockerfinwatch.config import SSHServerConfig
 
 
 class SSHClientError(Exception):

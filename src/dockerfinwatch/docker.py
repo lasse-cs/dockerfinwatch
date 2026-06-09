@@ -1,7 +1,7 @@
 import json
 from dataclasses import dataclass
 
-from textual_dockerclustermon.commands import CommandError, CommandRunner
+from dockerfinwatch.commands import CommandError, CommandRunner
 
 
 DOCKER_PS_COMMAND = ["docker", "ps", "--format", "{{json .}}"]

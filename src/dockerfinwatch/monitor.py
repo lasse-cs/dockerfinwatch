@@ -3,7 +3,7 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import Protocol
 
-from textual_dockerclustermon.docker import Container, DockerQueryError
+from dockerfinwatch.docker import Container, DockerQueryError
 
 
 @dataclass(frozen=True)

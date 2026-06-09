@@ -3,13 +3,13 @@ from collections.abc import Sequence
 import paramiko
 import pytest
 
-from textual_dockerclustermon.commands import (
+from dockerfinwatch.commands import (
     CommandConnectionError,
     CommandResult,
     CommandTimeoutError,
 )
-from textual_dockerclustermon.config import SSHServerConfig
-from textual_dockerclustermon.ssh import SSHCommandRunner
+from dockerfinwatch.config import SSHServerConfig
+from dockerfinwatch.ssh import SSHCommandRunner
 
 
 class FakeConnectedSSHClient:

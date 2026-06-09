@@ -4,21 +4,21 @@ from collections.abc import Callable, Mapping
 from contextlib import ExitStack
 from pathlib import Path
 
-from textual_dockerclustermon.commands import CommandRunner
-from textual_dockerclustermon.config import AppConfig, ServerConfig, load_config
-from textual_dockerclustermon.docker import (
+from dockerfinwatch.commands import CommandRunner
+from dockerfinwatch.config import AppConfig, ServerConfig, load_config
+from dockerfinwatch.docker import (
     DockerContainerQuery,
     DockerPsQuery,
     DockerStatsQuery,
 )
-from textual_dockerclustermon.monitor import MonitorService
-from textual_dockerclustermon.runner_factory import create_command_runner
-from textual_dockerclustermon.ui import DockerClusterMonitorApp
+from dockerfinwatch.monitor import MonitorService
+from dockerfinwatch.runner_factory import create_command_runner
+from dockerfinwatch.ui import DockerClusterMonitorApp
 
 
-CONFIG_ENV_VAR = "DOCKERCLUSTERMON_CONFIG"
-CONFIG_FILENAME = "dockerclustermon.toml"
-CONFIG_DIR_NAME = "dockerclustermon"
+CONFIG_ENV_VAR = "DOCKERFINWATCH_CONFIG"
+CONFIG_FILENAME = "config.toml"
+CONFIG_DIR_NAME = "dockerfinwatch"
 CommandRunnerFactory = Callable[[ServerConfig], CommandRunner]
 
 

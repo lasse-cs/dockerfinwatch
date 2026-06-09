@@ -3,7 +3,7 @@ from collections.abc import Sequence
 from types import TracebackType
 from typing import Protocol, Self
 
-from textual_dockerclustermon.commands import (
+from dockerfinwatch.commands import (
     CommandConnectionError,
     CommandResult,
     CommandTimeoutError,

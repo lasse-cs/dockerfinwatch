@@ -2,7 +2,7 @@ from collections.abc import Sequence
 from types import TracebackType
 from typing import Self
 
-from textual_dockerclustermon.commands import CommandResult
+from dockerfinwatch.commands import CommandResult
 
 
 class DemoCommandRunner:
