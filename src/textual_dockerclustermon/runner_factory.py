@@ -3,7 +3,7 @@ import paramiko
 from textual_dockerclustermon.commands import CommandRunner
 from textual_dockerclustermon.config import ServerConfig, SSHServerConfig
 from textual_dockerclustermon.demo import DemoCommandRunner
-from textual_dockerclustermon.local import LocalCommandRunner
+from textual_dockerclustermon.local import LocalCommandRunner, SubprocessProcessRunner
 from textual_dockerclustermon.ssh import ParamikoSSHClient, SSHCommandRunner
 
 
@@ -12,7 +12,7 @@ def create_command_runner(server: ServerConfig) -> CommandRunner:
         return DemoCommandRunner()
 
     if server.kind == "local":
-        return LocalCommandRunner()
+        return LocalCommandRunner(process_runner=SubprocessProcessRunner())
 
     if server.kind == "ssh":
         if not isinstance(server, SSHServerConfig):
