@@ -58,3 +58,17 @@ def test_monitor_service_wraps_docker_ps_errors() -> None:
 
     assert str(error.value) == "docker query failed: permission denied"
     assert isinstance(error.value.__cause__, DockerPsError)
+
+
+def test_monitor_service_closes_cleanup_once() -> None:
+    cleanup_calls = []
+    monitor = MonitorService(
+        server_name="prod",
+        docker_query=FakeDockerPsQuery([]),
+        cleanup=lambda: cleanup_calls.append("closed"),
+    )
+
+    monitor.close()
+    monitor.close()
+
+    assert cleanup_calls == ["closed"]

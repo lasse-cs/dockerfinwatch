@@ -16,6 +16,7 @@ class FakeMonitorService:
     def __init__(self, snapshot: MonitorSnapshot) -> None:
         self.snapshot = snapshot
         self.refresh_count = 0
+        self.close_count = 0
 
     @property
     def server_name(self) -> str:
@@ -24,6 +25,9 @@ class FakeMonitorService:
     def refresh(self) -> MonitorSnapshot:
         self.refresh_count += 1
         return self.snapshot
+
+    def close(self) -> None:
+        self.close_count += 1
 
 
 class BlockingMonitorService:
@@ -45,12 +49,18 @@ class BlockingMonitorService:
         self.release.wait(timeout=1)
         return self.snapshot
 
+    def close(self) -> None:
+        pass
+
 
 class FailingMonitorService:
     server_name = "prod"
 
     def refresh(self) -> MonitorSnapshot:
         raise MonitorRefreshError("docker ps failed: permission denied")
+
+    def close(self) -> None:
+        pass
 
 
 class SequenceMonitorService:
@@ -67,6 +77,9 @@ class SequenceMonitorService:
         if isinstance(result, MonitorRefreshError):
             raise result
         return result
+
+    def close(self) -> None:
+        pass
 
 
 def snapshot_with_container(name: str, server_name: str = "prod") -> MonitorSnapshot:
@@ -136,6 +149,8 @@ async def test_app_displays_monitor_snapshot_in_table() -> None:
         assert table.get_cell_at(Coordinate(0, 9)) == "80/tcp"
         assert table.get_cell_at(Coordinate(0, 10)) == "abc123"
 
+    assert monitor.close_count == 1
+
 
 @pytest.mark.asyncio
 async def test_app_displays_one_table_per_monitor() -> None:
@@ -158,6 +173,9 @@ async def test_app_displays_one_table_per_monitor() -> None:
         assert second_status.content == "prod-b | last updated 12:30:00 UTC"
         assert first_table.get_cell_at(Coordinate(0, 0)) == "web"
         assert second_table.get_cell_at(Coordinate(0, 0)) == "api"
+
+    assert first_monitor.close_count == 1
+    assert second_monitor.close_count == 1
 
 
 @pytest.mark.asyncio

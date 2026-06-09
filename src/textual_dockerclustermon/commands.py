@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+from types import TracebackType
 from typing import Protocol
 
 
@@ -22,4 +23,13 @@ class CommandTimeoutError(CommandError):
 
 
 class CommandRunner(Protocol):
+    def __enter__(self) -> "CommandRunner": ...
+
+    def __exit__(
+        self,
+        exc_type: type[BaseException] | None,
+        exc: BaseException | None,
+        traceback: TracebackType | None,
+    ) -> None: ...
+
     def run(self, command: str, timeout_seconds: float) -> CommandResult: ...

@@ -30,10 +30,12 @@ class MonitorService:
         self,
         server_name: str,
         docker_query: DockerQuery,
+        cleanup: Callable[[], None] | None = None,
         clock: Callable[[], datetime] = utc_now,
     ) -> None:
         self._server_name = server_name
         self._docker_query = docker_query
+        self._cleanup = cleanup
         self._clock = clock
 
     @property
@@ -51,3 +53,10 @@ class MonitorService:
             containers=containers,
             updated_at=self._clock(),
         )
+
+    def close(self) -> None:
+        if self._cleanup is None:
+            return
+        cleanup = self._cleanup
+        self._cleanup = None
+        cleanup()

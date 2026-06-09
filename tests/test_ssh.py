@@ -109,6 +109,15 @@ def test_ssh_command_runner_reconnects_inactive_connection() -> None:
     ]
 
 
+def test_ssh_command_runner_closes_active_connection_on_exit() -> None:
+    client = FakeConnectedSSHClient()
+
+    with SSHCommandRunner(config=ssh_config(), client_factory=lambda: client) as runner:
+        runner.run("docker ps", 20)
+
+    assert client.closed is True
+
+
 def test_ssh_command_runner_wraps_timeouts() -> None:
     client = FakeConnectedSSHClient()
     client.error = TimeoutError("timed out")

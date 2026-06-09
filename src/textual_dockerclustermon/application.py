@@ -1,4 +1,5 @@
 from collections.abc import Callable
+from contextlib import ExitStack
 from pathlib import Path
 
 from textual_dockerclustermon.commands import CommandRunner
@@ -30,12 +31,13 @@ def create_app_from_config(
 ) -> DockerClusterMonitorApp:
     monitors = []
     for server in config.servers:
-        runner = command_runner_factory(server)
+        stack = ExitStack()
+        runner = stack.enter_context(command_runner_factory(server))
         docker_query = DockerContainerQuery(
             DockerPsQuery(runner),
             [DockerStatsQuery(runner)],
         )
-        monitors.append(MonitorService(server.name, docker_query))
+        monitors.append(MonitorService(server.name, docker_query, cleanup=stack.close))
 
     return DockerClusterMonitorApp(monitors, config.refresh_seconds)
 

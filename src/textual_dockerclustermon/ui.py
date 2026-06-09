@@ -14,6 +14,8 @@ class Monitor(Protocol):
 
     def refresh(self) -> MonitorSnapshot: ...
 
+    def close(self) -> None: ...
+
 
 class ServerMonitorView(Vertical):
     def __init__(
@@ -146,6 +148,10 @@ class DockerClusterMonitorApp(App[None]):
 
     def action_refresh(self) -> None:
         self._refresh()
+
+    def on_unmount(self) -> None:
+        for monitor in self._monitors:
+            monitor.close()
 
     def _refresh(self) -> None:
         for server_view in self.query(ServerMonitorView):

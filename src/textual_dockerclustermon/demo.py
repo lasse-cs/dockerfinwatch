@@ -1,7 +1,21 @@
+from types import TracebackType
+from typing import Self
+
 from textual_dockerclustermon.commands import CommandResult
 
 
 class DemoCommandRunner:
+    def __enter__(self) -> Self:
+        return self
+
+    def __exit__(
+        self,
+        exc_type: type[BaseException] | None,
+        exc: BaseException | None,
+        traceback: TracebackType | None,
+    ) -> None:
+        pass
+
     def run(self, command: str, timeout_seconds: float) -> CommandResult:
         if command.startswith("docker stats"):
             return CommandResult(

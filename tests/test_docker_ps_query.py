@@ -1,3 +1,6 @@
+from types import TracebackType
+from typing import Self
+
 import pytest
 
 from textual_dockerclustermon.commands import CommandConnectionError, CommandResult
@@ -14,6 +17,17 @@ class FakeRunner:
         self.result = result
         self.commands: list[str] = []
 
+    def __enter__(self) -> Self:
+        return self
+
+    def __exit__(
+        self,
+        exc_type: type[BaseException] | None,
+        exc: BaseException | None,
+        traceback: TracebackType | None,
+    ) -> None:
+        pass
+
     def run(self, command: str, timeout_seconds: float) -> CommandResult:
         self.commands.append(command)
         return self.result
@@ -24,12 +38,34 @@ class SequenceRunner:
         self.results = results
         self.commands: list[str] = []
 
+    def __enter__(self) -> Self:
+        return self
+
+    def __exit__(
+        self,
+        exc_type: type[BaseException] | None,
+        exc: BaseException | None,
+        traceback: TracebackType | None,
+    ) -> None:
+        pass
+
     def run(self, command: str, timeout_seconds: float) -> CommandResult:
         self.commands.append(command)
         return self.results.pop(0)
 
 
 class FailingRunner:
+    def __enter__(self) -> Self:
+        return self
+
+    def __exit__(
+        self,
+        exc_type: type[BaseException] | None,
+        exc: BaseException | None,
+        traceback: TracebackType | None,
+    ) -> None:
+        pass
+
     def run(self, command: str, timeout_seconds: float) -> CommandResult:
         raise CommandConnectionError("authentication failed")
 

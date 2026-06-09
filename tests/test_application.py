@@ -1,3 +1,6 @@
+from types import TracebackType
+from typing import Self
+
 import pytest
 from textual.coordinate import Coordinate
 from textual.widgets import DataTable, Static
@@ -10,6 +13,18 @@ from textual_dockerclustermon.commands import CommandResult
 class SequenceCommandRunner:
     def __init__(self, container_names: list[str]) -> None:
         self._container_names = container_names
+        self.closed = False
+
+    def __enter__(self) -> Self:
+        return self
+
+    def __exit__(
+        self,
+        exc_type: type[BaseException] | None,
+        exc: BaseException | None,
+        traceback: TracebackType | None,
+    ) -> None:
+        self.closed = True
 
     def run(self, command: str, timeout_seconds: float) -> CommandResult:
         if command.startswith("docker stats"):
@@ -122,3 +137,5 @@ kind = "demo"
                 table.row_count == 1 and table.get_cell_at(Coordinate(0, 0)) == "api"
             )
         )
+
+    assert runner.closed is True

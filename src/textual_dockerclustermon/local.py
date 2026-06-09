@@ -1,6 +1,7 @@
 import shlex
 import subprocess
-from typing import Protocol
+from types import TracebackType
+from typing import Protocol, Self
 
 from textual_dockerclustermon.commands import (
     CommandConnectionError,
@@ -36,6 +37,17 @@ class SubprocessProcessRunner:
 class LocalCommandRunner:
     def __init__(self, process_runner: LocalProcessRunner) -> None:
         self._process_runner = process_runner
+
+    def __enter__(self) -> Self:
+        return self
+
+    def __exit__(
+        self,
+        exc_type: type[BaseException] | None,
+        exc: BaseException | None,
+        traceback: TracebackType | None,
+    ) -> None:
+        pass
 
     def run(self, command: str, timeout_seconds: float) -> CommandResult:
         try:

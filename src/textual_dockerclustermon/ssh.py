@@ -1,6 +1,7 @@
 from collections.abc import Callable
 from pathlib import Path
-from typing import Protocol
+from types import TracebackType
+from typing import Protocol, Self
 
 import paramiko
 
@@ -75,6 +76,22 @@ class SSHCommandRunner:
         self._config = config
         self._client_factory = client_factory
         self._client: SSHClient | None = None
+
+    def __enter__(self) -> Self:
+        return self
+
+    def __exit__(
+        self,
+        exc_type: type[BaseException] | None,
+        exc: BaseException | None,
+        traceback: TracebackType | None,
+    ) -> None:
+        self.close()
+
+    def close(self) -> None:
+        if self._client is not None:
+            self._client.close()
+            self._client = None
 
     def run(self, command: str, timeout_seconds: float) -> CommandResult:
         try:
