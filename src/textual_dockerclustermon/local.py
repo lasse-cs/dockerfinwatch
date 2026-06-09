@@ -1,5 +1,5 @@
-import shlex
 import subprocess
+from collections.abc import Sequence
 from types import TracebackType
 from typing import Protocol, Self
 
@@ -13,7 +13,7 @@ from textual_dockerclustermon.commands import (
 class LocalProcessRunner(Protocol):
     def run(
         self,
-        args: list[str],
+        args: Sequence[str],
         timeout_seconds: float,
     ) -> tuple[str, str, int]: ...
 
@@ -21,7 +21,7 @@ class LocalProcessRunner(Protocol):
 class SubprocessProcessRunner:
     def run(
         self,
-        args: list[str],
+        args: Sequence[str],
         timeout_seconds: float,
     ) -> tuple[str, str, int]:
         result = subprocess.run(
@@ -49,10 +49,10 @@ class LocalCommandRunner:
     ) -> None:
         pass
 
-    def run(self, command: str, timeout_seconds: float) -> CommandResult:
+    def run(self, command: Sequence[str], timeout_seconds: float) -> CommandResult:
         try:
             stdout, stderr, exit_code = self._process_runner.run(
-                shlex.split(command),
+                command,
                 timeout_seconds,
             )
         except subprocess.TimeoutExpired as error:

@@ -4,8 +4,8 @@ from dataclasses import dataclass
 from textual_dockerclustermon.commands import CommandError, CommandRunner
 
 
-DOCKER_PS_COMMAND = "docker ps --format '{{json .}}'"
-DOCKER_STATS_COMMAND = "docker stats --no-stream --format '{{json .}}'"
+DOCKER_PS_COMMAND = ["docker", "ps", "--format", "{{json .}}"]
+DOCKER_STATS_COMMAND = ["docker", "stats", "--no-stream", "--format", "{{json .}}"]
 
 
 @dataclass(frozen=True)
@@ -86,7 +86,7 @@ class DockerStatsQuery:
         if not container_ids:
             return {}
 
-        command = f"{DOCKER_STATS_COMMAND} {' '.join(container_ids)}"
+        command = [*DOCKER_STATS_COMMAND, *container_ids]
         try:
             result = self._runner.run(command, self._timeout_seconds)
         except CommandError as error:

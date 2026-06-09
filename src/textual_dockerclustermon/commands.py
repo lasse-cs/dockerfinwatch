@@ -1,3 +1,4 @@
+from collections.abc import Sequence
 from dataclasses import dataclass
 from types import TracebackType
 from typing import Protocol
@@ -32,4 +33,4 @@ class CommandRunner(Protocol):
         traceback: TracebackType | None,
     ) -> None: ...
 
-    def run(self, command: str, timeout_seconds: float) -> CommandResult: ...
+    def run(self, command: Sequence[str], timeout_seconds: float) -> CommandResult: ...

@@ -1,3 +1,4 @@
+from collections.abc import Sequence
 from pathlib import Path
 from types import TracebackType
 from typing import Self
@@ -32,8 +33,8 @@ class SequenceCommandRunner:
     ) -> None:
         self.closed = True
 
-    def run(self, command: str, timeout_seconds: float) -> CommandResult:
-        if command.startswith("docker stats"):
+    def run(self, command: Sequence[str], timeout_seconds: float) -> CommandResult:
+        if command[:2] == ["docker", "stats"]:
             return CommandResult(
                 stdout=(
                     '{"ID":"abc123","CPUPerc":"1.23%","MemUsage":"10MiB / 1GiB","MemPerc":"0.98%","NetIO":"1kB / 2kB","BlockIO":"0B / 0B","PIDs":"4"}\n'

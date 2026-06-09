@@ -1,3 +1,4 @@
+from collections.abc import Sequence
 from types import TracebackType
 from typing import Self
 
@@ -15,7 +16,7 @@ from textual_dockerclustermon.docker import (
 class FakeRunner:
     def __init__(self, result: CommandResult) -> None:
         self.result = result
-        self.commands: list[str] = []
+        self.commands: list[list[str]] = []
 
     def __enter__(self) -> Self:
         return self
@@ -28,15 +29,15 @@ class FakeRunner:
     ) -> None:
         pass
 
-    def run(self, command: str, timeout_seconds: float) -> CommandResult:
-        self.commands.append(command)
+    def run(self, command: Sequence[str], timeout_seconds: float) -> CommandResult:
+        self.commands.append(list(command))
         return self.result
 
 
 class SequenceRunner:
     def __init__(self, results: list[CommandResult]) -> None:
         self.results = results
-        self.commands: list[str] = []
+        self.commands: list[list[str]] = []
 
     def __enter__(self) -> Self:
         return self
@@ -49,8 +50,8 @@ class SequenceRunner:
     ) -> None:
         pass
 
-    def run(self, command: str, timeout_seconds: float) -> CommandResult:
-        self.commands.append(command)
+    def run(self, command: Sequence[str], timeout_seconds: float) -> CommandResult:
+        self.commands.append(list(command))
         return self.results.pop(0)
 
 
@@ -66,7 +67,7 @@ class FailingRunner:
     ) -> None:
         pass
 
-    def run(self, command: str, timeout_seconds: float) -> CommandResult:
+    def run(self, command: Sequence[str], timeout_seconds: float) -> CommandResult:
         raise CommandConnectionError("authentication failed")
 
 
@@ -84,7 +85,7 @@ def test_docker_ps_query_returns_containers_from_json_lines() -> None:
 
     metadata_by_id = DockerPsQuery(runner).fetch()
 
-    assert runner.commands == ["docker ps --format '{{json .}}'"]
+    assert runner.commands == [["docker", "ps", "--format", "{{json .}}"]]
     assert metadata_by_id["abc123"].id == "abc123"
     assert metadata_by_id["abc123"].name == "web"
     assert metadata_by_id["abc123"].image == "nginx:latest"
@@ -122,8 +123,16 @@ def test_docker_container_query_enriches_ps_containers_with_stats() -> None:
     ).fetch()
 
     assert runner.commands == [
-        "docker ps --format '{{json .}}'",
-        "docker stats --no-stream --format '{{json .}}' abc123 def456",
+        ["docker", "ps", "--format", "{{json .}}"],
+        [
+            "docker",
+            "stats",
+            "--no-stream",
+            "--format",
+            "{{json .}}",
+            "abc123",
+            "def456",
+        ],
     ]
     assert containers[0].metadata.name == "web"
     assert containers[0].metadata.image == "nginx:latest"
@@ -145,7 +154,7 @@ def test_docker_container_query_skips_stats_when_no_containers_exist() -> None:
     ).fetch()
 
     assert containers == []
-    assert runner.commands == ["docker ps --format '{{json .}}'"]
+    assert runner.commands == [["docker", "ps", "--format", "{{json .}}"]]
 
 
 def test_docker_ps_query_raises_when_docker_ps_fails() -> None:

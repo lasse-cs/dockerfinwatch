@@ -1,3 +1,5 @@
+from collections.abc import Sequence
+
 import paramiko
 import pytest
 
@@ -25,8 +27,10 @@ class FakeConnectedSSHClient:
     def is_active(self) -> bool:
         return self.active
 
-    def run(self, command: str, timeout_seconds: float) -> CommandResult:
-        self.run_calls.append({"command": command, "timeout_seconds": timeout_seconds})
+    def run(self, command: Sequence[str], timeout_seconds: float) -> CommandResult:
+        self.run_calls.append(
+            {"command": list(command), "timeout_seconds": timeout_seconds}
+        )
         if self.error is not None:
             raise self.error
         return self.result
@@ -57,11 +61,11 @@ def test_ssh_command_runner_returns_command_result() -> None:
 
     runner = SSHCommandRunner(config=config, client_factory=client_factory)
 
-    result = runner.run("docker ps", 20)
+    result = runner.run(["docker", "ps"], 20)
 
     assert factory_calls == [client]
     assert client.connect_calls == [{"config": config, "timeout": 20}]
-    assert client.run_calls == [{"command": "docker ps", "timeout_seconds": 20}]
+    assert client.run_calls == [{"command": ["docker", "ps"], "timeout_seconds": 20}]
     assert client.closed is False
     assert result == CommandResult(stdout="out", stderr="err", exit_code=7)
 
@@ -76,14 +80,14 @@ def test_ssh_command_runner_reuses_active_connection() -> None:
 
     runner = SSHCommandRunner(config=ssh_config(), client_factory=client_factory)
 
-    runner.run("docker ps", 20)
-    runner.run("docker ps --all", 20)
+    runner.run(["docker", "ps"], 20)
+    runner.run(["docker", "ps", "--all"], 20)
 
     assert created_clients == [client]
     assert client.connect_calls == [{"config": ssh_config(), "timeout": 20}]
     assert client.run_calls == [
-        {"command": "docker ps", "timeout_seconds": 20},
-        {"command": "docker ps --all", "timeout_seconds": 20},
+        {"command": ["docker", "ps"], "timeout_seconds": 20},
+        {"command": ["docker", "ps", "--all"], "timeout_seconds": 20},
     ]
     assert client.closed is False
 
@@ -97,15 +101,15 @@ def test_ssh_command_runner_reconnects_inactive_connection() -> None:
         client_factory=lambda: clients.pop(0),
     )
 
-    runner.run("docker ps", 20)
+    runner.run(["docker", "ps"], 20)
     stale_client.active = False
-    runner.run("docker ps --all", 20)
+    runner.run(["docker", "ps", "--all"], 20)
 
     assert stale_client.closed is True
     assert stale_client.connect_calls == [{"config": ssh_config(), "timeout": 20}]
     assert fresh_client.connect_calls == [{"config": ssh_config(), "timeout": 20}]
     assert fresh_client.run_calls == [
-        {"command": "docker ps --all", "timeout_seconds": 20}
+        {"command": ["docker", "ps", "--all"], "timeout_seconds": 20}
     ]
 
 
@@ -113,7 +117,7 @@ def test_ssh_command_runner_closes_active_connection_on_exit() -> None:
     client = FakeConnectedSSHClient()
 
     with SSHCommandRunner(config=ssh_config(), client_factory=lambda: client) as runner:
-        runner.run("docker ps", 20)
+        runner.run(["docker", "ps"], 20)
 
     assert client.closed is True
 
@@ -127,9 +131,9 @@ def test_ssh_command_runner_wraps_timeouts() -> None:
     )
 
     with pytest.raises(CommandTimeoutError) as error:
-        runner.run("docker ps", 20)
+        runner.run(["docker", "ps"], 20)
 
-    assert str(error.value) == "command timed out: docker ps"
+    assert str(error.value) == "command timed out: ['docker', 'ps']"
     assert isinstance(error.value.__cause__, TimeoutError)
     assert client.closed is False
 
@@ -141,7 +145,7 @@ def test_ssh_command_runner_wraps_connection_errors() -> None:
     runner = SSHCommandRunner(config=ssh_config(), client_factory=client_factory)
 
     with pytest.raises(CommandConnectionError) as error:
-        runner.run("docker ps", 20)
+        runner.run(["docker", "ps"], 20)
 
     assert str(error.value) == "could not run SSH command: connection failed"
     assert isinstance(error.value.__cause__, paramiko.SSHException)

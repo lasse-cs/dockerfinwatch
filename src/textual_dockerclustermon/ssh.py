@@ -1,4 +1,6 @@
+import shlex
 from collections.abc import Callable
+from collections.abc import Sequence
 from pathlib import Path
 from types import TracebackType
 from typing import Protocol, Self
@@ -22,7 +24,7 @@ class SSHClient(Protocol):
 
     def is_active(self) -> bool: ...
 
-    def run(self, command: str, timeout_seconds: float) -> CommandResult: ...
+    def run(self, command: Sequence[str], timeout_seconds: float) -> CommandResult: ...
 
     def close(self) -> None: ...
 
@@ -35,10 +37,10 @@ class ParamikoSSHClient:
         transport = self.client.get_transport()
         return transport is not None and transport.is_active()
 
-    def run(self, command: str, timeout_seconds: float) -> CommandResult:
+    def run(self, command: Sequence[str], timeout_seconds: float) -> CommandResult:
         try:
             _, stdout, stderr = self.client.exec_command(
-                command,
+                shlex.join(command),
                 timeout=timeout_seconds,
             )
         except paramiko.SSHException as e:
@@ -93,7 +95,7 @@ class SSHCommandRunner:
             self._client.close()
             self._client = None
 
-    def run(self, command: str, timeout_seconds: float) -> CommandResult:
+    def run(self, command: Sequence[str], timeout_seconds: float) -> CommandResult:
         try:
             client = self._connected_client(timeout_seconds)
             return client.run(command, timeout_seconds)
