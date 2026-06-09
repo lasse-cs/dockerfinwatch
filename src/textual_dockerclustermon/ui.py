@@ -133,26 +133,25 @@ class DockerClusterMonitorApp(App[None]):
 
     def __init__(self, monitors: list[Monitor], refresh_seconds: float = 60) -> None:
         super().__init__()
-        self._server_views = [
-            ServerMonitorView(monitor, index, refresh_seconds)
-            for index, monitor in enumerate(monitors)
-        ]
+        self._monitors = monitors
+        self._refresh_seconds = refresh_seconds
 
     def compose(self) -> ComposeResult:
         yield Header(show_clock=True)
         yield Static(self._server_count_status(), id="status")
         with VerticalScroll(id="servers"):
-            yield from self._server_views
+            for index, monitor in enumerate(self._monitors):
+                yield ServerMonitorView(monitor, index, self._refresh_seconds)
         yield Footer()
 
     def action_refresh(self) -> None:
         self._refresh()
 
     def _refresh(self) -> None:
-        for server_view in self._server_views:
+        for server_view in self.query(ServerMonitorView):
             server_view.refresh_monitor()
 
     def _server_count_status(self) -> str:
-        server_count = len(self._server_views)
+        server_count = len(self._monitors)
         label = "server" if server_count == 1 else "servers"
         return f"{server_count} {label}"
