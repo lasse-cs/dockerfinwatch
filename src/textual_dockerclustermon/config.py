@@ -32,18 +32,19 @@ class SSHServerConfig(ServerConfig):
 
 @dataclass(frozen=True)
 class AppConfig:
-    server: ServerConfig
+    servers: list[ServerConfig]
     refresh_seconds: int
 
 
 def load_config(path: Path) -> AppConfig:
     data = tomllib.loads(path.read_text(encoding="utf-8"))
-    server = data["server"]
     defaults = data.get("defaults", {})
-    kind = str(server["kind"])
 
     return AppConfig(
-        server=_load_server_config(server, kind, defaults),
+        servers=[
+            _load_server_config(server, str(server["kind"]), defaults)
+            for server in data["servers"]
+        ],
         refresh_seconds=defaults.get("refresh_seconds", 60),
     )
 

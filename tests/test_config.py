@@ -12,7 +12,7 @@ def test_load_config_reads_demo_server_from_toml(tmp_path) -> None:
     config_path = tmp_path / "dockerclustermon.toml"
     config_path.write_text(
         """
-[server]
+[[servers]]
 name = "demo"
 kind = "demo"
 """.strip(),
@@ -21,10 +21,38 @@ kind = "demo"
 
     config = load_config(config_path)
 
-    assert isinstance(config.server, DemoServerConfig)
-    assert config.server.name == "demo"
-    assert config.server.kind == "demo"
+    assert len(config.servers) == 1
+    assert isinstance(config.servers[0], DemoServerConfig)
+    assert config.servers[0].name == "demo"
+    assert config.servers[0].kind == "demo"
     assert config.refresh_seconds == 60
+
+
+def test_load_config_reads_multiple_servers_from_toml(tmp_path) -> None:
+    config_path = tmp_path / "dockerclustermon.toml"
+    config_path.write_text(
+        """
+[[servers]]
+name = "local"
+kind = "local"
+
+[[servers]]
+name = "prod"
+kind = "ssh"
+host = "prod.example.com"
+username = "deploy"
+""".strip(),
+        encoding="utf-8",
+    )
+
+    config = load_config(config_path)
+
+    assert len(config.servers) == 2
+    assert isinstance(config.servers[0], LocalServerConfig)
+    assert config.servers[0].name == "local"
+    assert isinstance(config.servers[1], SSHServerConfig)
+    assert config.servers[1].name == "prod"
+    assert config.servers[1].host == "prod.example.com"
 
 
 def test_load_config_reads_refresh_seconds_default(tmp_path) -> None:
@@ -34,7 +62,7 @@ def test_load_config_reads_refresh_seconds_default(tmp_path) -> None:
 [defaults]
 refresh_seconds = 30
 
-[server]
+[[servers]]
 name = "demo"
 kind = "demo"
 """.strip(),
@@ -50,7 +78,7 @@ def test_load_config_reads_local_server_from_toml(tmp_path) -> None:
     config_path = tmp_path / "dockerclustermon.toml"
     config_path.write_text(
         """
-[server]
+[[servers]]
 name = "local"
 kind = "local"
 """.strip(),
@@ -59,16 +87,16 @@ kind = "local"
 
     config = load_config(config_path)
 
-    assert isinstance(config.server, LocalServerConfig)
-    assert config.server.name == "local"
-    assert config.server.kind == "local"
+    assert isinstance(config.servers[0], LocalServerConfig)
+    assert config.servers[0].name == "local"
+    assert config.servers[0].kind == "local"
 
 
 def test_load_config_reads_ssh_server_from_toml(tmp_path) -> None:
     config_path = tmp_path / "dockerclustermon.toml"
     config_path.write_text(
         """
-[server]
+[[servers]]
 name = "prod"
 kind = "ssh"
 host = "prod.example.com"
@@ -81,21 +109,21 @@ key_filename = "/home/me/.ssh/id_ed25519"
 
     config = load_config(config_path)
 
-    assert isinstance(config.server, SSHServerConfig)
-    assert config.server.name == "prod"
-    assert config.server.kind == "ssh"
-    assert config.server.host == "prod.example.com"
-    assert config.server.username == "deploy"
-    assert config.server.port == 2222
-    assert config.server.key_filename == "/home/me/.ssh/id_ed25519"
-    assert config.server.ssh_config_file == "~/.ssh/config"
+    assert isinstance(config.servers[0], SSHServerConfig)
+    assert config.servers[0].name == "prod"
+    assert config.servers[0].kind == "ssh"
+    assert config.servers[0].host == "prod.example.com"
+    assert config.servers[0].username == "deploy"
+    assert config.servers[0].port == 2222
+    assert config.servers[0].key_filename == "/home/me/.ssh/id_ed25519"
+    assert config.servers[0].ssh_config_file == "~/.ssh/config"
 
 
 def test_load_config_defaults_ssh_optional_fields(tmp_path) -> None:
     config_path = tmp_path / "dockerclustermon.toml"
     config_path.write_text(
         """
-[server]
+[[servers]]
 name = "prod"
 kind = "ssh"
 host = "prod.example.com"
@@ -105,11 +133,11 @@ host = "prod.example.com"
 
     config = load_config(config_path)
 
-    assert isinstance(config.server, SSHServerConfig)
-    assert config.server.username is None
-    assert config.server.port is None
-    assert config.server.key_filename is None
-    assert config.server.ssh_config_file == "~/.ssh/config"
+    assert isinstance(config.servers[0], SSHServerConfig)
+    assert config.servers[0].username is None
+    assert config.servers[0].port is None
+    assert config.servers[0].key_filename is None
+    assert config.servers[0].ssh_config_file == "~/.ssh/config"
 
 
 def test_load_config_reads_ssh_config_file_default(tmp_path) -> None:
@@ -120,7 +148,7 @@ def test_load_config_reads_ssh_config_file_default(tmp_path) -> None:
 [defaults]
 ssh_config_file = "{ssh_config_path}"
 
-[server]
+[[servers]]
 name = "prod"
 kind = "ssh"
 host = "prod.example.com"
@@ -130,8 +158,8 @@ host = "prod.example.com"
 
     config = load_config(config_path)
 
-    assert isinstance(config.server, SSHServerConfig)
-    assert config.server.ssh_config_file == str(ssh_config_path)
+    assert isinstance(config.servers[0], SSHServerConfig)
+    assert config.servers[0].ssh_config_file == str(ssh_config_path)
 
 
 def test_load_config_can_disable_ssh_config_file(tmp_path) -> None:
@@ -141,7 +169,7 @@ def test_load_config_can_disable_ssh_config_file(tmp_path) -> None:
 [defaults]
 ssh_config_file = false
 
-[server]
+[[servers]]
 name = "prod"
 kind = "ssh"
 host = "prod.example.com"
@@ -151,15 +179,15 @@ host = "prod.example.com"
 
     config = load_config(config_path)
 
-    assert isinstance(config.server, SSHServerConfig)
-    assert config.server.ssh_config_file is None
+    assert isinstance(config.servers[0], SSHServerConfig)
+    assert config.servers[0].ssh_config_file is None
 
 
 def test_load_config_rejects_unknown_server_kind(tmp_path) -> None:
     config_path = tmp_path / "dockerclustermon.toml"
     config_path.write_text(
         """
-[server]
+[[servers]]
 name = "prod"
 kind = "unknown"
 """.strip(),

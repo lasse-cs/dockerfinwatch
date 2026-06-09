@@ -17,6 +17,10 @@ class FakeMonitorService:
         self.snapshot = snapshot
         self.refresh_count = 0
 
+    @property
+    def server_name(self) -> str:
+        return self.snapshot.server_name
+
     def refresh(self) -> MonitorSnapshot:
         self.refresh_count += 1
         return self.snapshot
@@ -30,6 +34,10 @@ class BlockingMonitorService:
         self.started = threading.Event()
         self.release = threading.Event()
 
+    @property
+    def server_name(self) -> str:
+        return self.snapshot.server_name
+
     def refresh(self) -> MonitorSnapshot:
         self.refresh_count += 1
         self.thread_id = threading.get_ident()
@@ -39,13 +47,20 @@ class BlockingMonitorService:
 
 
 class FailingMonitorService:
+    server_name = "prod"
+
     def refresh(self) -> MonitorSnapshot:
         raise MonitorRefreshError("docker ps failed: permission denied")
 
 
 class SequenceMonitorService:
-    def __init__(self, results: list[MonitorSnapshot | MonitorRefreshError]) -> None:
+    def __init__(
+        self,
+        results: list[MonitorSnapshot | MonitorRefreshError],
+        server_name: str = "prod",
+    ) -> None:
         self.results = results
+        self.server_name = server_name
 
     def refresh(self) -> MonitorSnapshot:
         result = self.results.pop(0)
@@ -54,9 +69,9 @@ class SequenceMonitorService:
         return result
 
 
-def snapshot_with_container(name: str) -> MonitorSnapshot:
+def snapshot_with_container(name: str, server_name: str = "prod") -> MonitorSnapshot:
     return MonitorSnapshot(
-        server_name="prod",
+        server_name=server_name,
         containers=[
             container(name=name),
         ],
@@ -97,13 +112,13 @@ async def test_app_displays_monitor_snapshot_in_table() -> None:
             updated_at=datetime(2026, 6, 8, 12, 30, tzinfo=UTC),
         )
     )
-    app = DockerClusterMonitorApp(monitor)
+    app = DockerClusterMonitorApp([monitor])
 
     async with app.run_test() as pilot:
         await pilot.pause()
 
-        status = app.query_one("#status", Static)
-        table = app.query_one("#containers", DataTable)
+        status = app.query_one("#server-status-0", Static)
+        table = app.query_one("#containers-0", DataTable)
         await wait_until(lambda: status.content == "prod | last updated 12:30:00 UTC")
 
         assert monitor.refresh_count == 1
@@ -123,9 +138,32 @@ async def test_app_displays_monitor_snapshot_in_table() -> None:
 
 
 @pytest.mark.asyncio
+async def test_app_displays_one_table_per_monitor() -> None:
+    first_monitor = FakeMonitorService(snapshot_with_container("web", "prod-a"))
+    second_monitor = FakeMonitorService(snapshot_with_container("api", "prod-b"))
+    app = DockerClusterMonitorApp([first_monitor, second_monitor])
+
+    async with app.run_test() as pilot:
+        await pilot.pause()
+
+        first_status = app.query_one("#server-status-0", Static)
+        second_status = app.query_one("#server-status-1", Static)
+        first_table = app.query_one("#containers-0", DataTable)
+        second_table = app.query_one("#containers-1", DataTable)
+        await wait_until(
+            lambda: first_table.row_count == 1 and second_table.row_count == 1
+        )
+
+        assert first_status.content == "prod-a | last updated 12:30:00 UTC"
+        assert second_status.content == "prod-b | last updated 12:30:00 UTC"
+        assert first_table.get_cell_at(Coordinate(0, 0)) == "web"
+        assert second_table.get_cell_at(Coordinate(0, 0)) == "api"
+
+
+@pytest.mark.asyncio
 async def test_app_refreshes_on_configured_interval() -> None:
     monitor = FakeMonitorService(snapshot_with_container("web"))
-    app = DockerClusterMonitorApp(monitor, refresh_seconds=0.05)
+    app = DockerClusterMonitorApp([monitor], refresh_seconds=0.05)
 
     async with app.run_test() as pilot:
         await pilot.pause()
@@ -139,13 +177,13 @@ async def test_app_refreshes_on_configured_interval() -> None:
 async def test_app_runs_refresh_in_worker_thread() -> None:
     main_thread_id = threading.get_ident()
     monitor = BlockingMonitorService(snapshot_with_container("web"))
-    app = DockerClusterMonitorApp(monitor)
+    app = DockerClusterMonitorApp([monitor])
 
     async with app.run_test() as pilot:
         await pilot.pause()
 
-        status = app.query_one("#status", Static)
-        assert status.content == "Refreshing..."
+        status = app.query_one("#server-status-0", Static)
+        assert status.content == "prod | refreshing..."
         assert await asyncio.to_thread(monitor.started.wait, 1)
         assert monitor.thread_id != main_thread_id
 
@@ -158,44 +196,68 @@ async def test_app_runs_refresh_in_worker_thread() -> None:
 
 
 @pytest.mark.asyncio
-async def test_app_shows_status_when_docker_ps_refresh_fails() -> None:
-    app = DockerClusterMonitorApp(FailingMonitorService())
+async def test_app_refreshes_servers_independently() -> None:
+    slow_monitor = BlockingMonitorService(snapshot_with_container("web", "slow"))
+    fast_monitor = FakeMonitorService(snapshot_with_container("api", "fast"))
+    app = DockerClusterMonitorApp([slow_monitor, fast_monitor])
 
     async with app.run_test() as pilot:
         await pilot.pause()
 
-        status = app.query_one("#status", Static)
-        table = app.query_one("#containers", DataTable)
+        slow_status = app.query_one("#server-status-0", Static)
+        fast_table = app.query_one("#containers-1", DataTable)
+
+        assert await asyncio.to_thread(slow_monitor.started.wait, 1)
+        assert slow_status.content == "slow | refreshing..."
+        await wait_until(lambda: fast_table.row_count == 1)
+
+        assert fast_monitor.refresh_count == 1
+        assert fast_table.get_cell_at(Coordinate(0, 0)) == "api"
+
+        slow_monitor.release.set()
+
+
+@pytest.mark.asyncio
+async def test_app_shows_status_when_docker_ps_refresh_fails() -> None:
+    app = DockerClusterMonitorApp([FailingMonitorService()])
+
+    async with app.run_test() as pilot:
+        await pilot.pause()
+
+        status = app.query_one("#server-status-0", Static)
+        table = app.query_one("#containers-0", DataTable)
         await wait_until(
-            lambda: status.content == "docker ps failed: permission denied"
+            lambda: status.content == "prod | docker ps failed: permission denied"
         )
 
-        assert status.content == "docker ps failed: permission denied"
+        assert status.content == "prod | docker ps failed: permission denied"
         assert table.row_count == 0
 
 
 @pytest.mark.asyncio
 async def test_app_preserves_table_when_manual_refresh_fails() -> None:
     app = DockerClusterMonitorApp(
-        SequenceMonitorService(
-            [
-                snapshot_with_container("web"),
-                MonitorRefreshError("docker ps failed: permission denied"),
-            ]
-        )
+        [
+            SequenceMonitorService(
+                [
+                    snapshot_with_container("web"),
+                    MonitorRefreshError("docker ps failed: permission denied"),
+                ]
+            )
+        ]
     )
 
     async with app.run_test() as pilot:
         await pilot.pause()
-        status = app.query_one("#status", Static)
-        table = app.query_one("#containers", DataTable)
+        status = app.query_one("#server-status-0", Static)
+        table = app.query_one("#containers-0", DataTable)
         await wait_until(lambda: table.row_count == 1)
 
         await pilot.press("r")
         await wait_until(
-            lambda: status.content == "docker ps failed: permission denied"
+            lambda: status.content == "prod | docker ps failed: permission denied"
         )
 
-        assert status.content == "docker ps failed: permission denied"
+        assert status.content == "prod | docker ps failed: permission denied"
         assert table.row_count == 1
         assert table.get_cell_at(Coordinate(0, 0)) == "web"

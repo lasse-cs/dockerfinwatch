@@ -37,7 +37,7 @@ async def test_create_app_wires_demo_server_from_config(tmp_path) -> None:
     config_path = tmp_path / "dockerclustermon.toml"
     config_path.write_text(
         """
-[server]
+[[servers]]
 name = "demo-prod"
 kind = "demo"
 """.strip(),
@@ -49,8 +49,8 @@ kind = "demo"
     async with app.run_test() as pilot:
         await pilot.pause()
 
-        status = app.query_one("#status", Static)
-        table = app.query_one("#containers", DataTable)
+        status = app.query_one("#server-status-0", Static)
+        table = app.query_one("#containers-0", DataTable)
         await wait_until(lambda: table.row_count == 2)
 
         assert status.content.startswith("demo-prod | last updated ")
@@ -61,6 +61,41 @@ kind = "demo"
 
 
 @pytest.mark.asyncio
+async def test_create_app_wires_multiple_servers_from_config(tmp_path) -> None:
+    config_path = tmp_path / "dockerclustermon.toml"
+    config_path.write_text(
+        """
+[[servers]]
+name = "demo-a"
+kind = "demo"
+
+[[servers]]
+name = "demo-b"
+kind = "demo"
+""".strip(),
+        encoding="utf-8",
+    )
+
+    app = create_app(config_path)
+
+    async with app.run_test() as pilot:
+        await pilot.pause()
+
+        first_status = app.query_one("#server-status-0", Static)
+        second_status = app.query_one("#server-status-1", Static)
+        first_table = app.query_one("#containers-0", DataTable)
+        second_table = app.query_one("#containers-1", DataTable)
+        await wait_until(
+            lambda: first_table.row_count == 2 and second_table.row_count == 2
+        )
+
+        assert first_status.content.startswith("demo-a | last updated ")
+        assert second_status.content.startswith("demo-b | last updated ")
+        assert first_table.get_cell_at(Coordinate(0, 0)) == "web"
+        assert second_table.get_cell_at(Coordinate(0, 0)) == "web"
+
+
+@pytest.mark.asyncio
 async def test_create_app_uses_configured_refresh_interval(tmp_path) -> None:
     config_path = tmp_path / "dockerclustermon.toml"
     config_path.write_text(
@@ -68,7 +103,7 @@ async def test_create_app_uses_configured_refresh_interval(tmp_path) -> None:
 [defaults]
 refresh_seconds = 0.05
 
-[server]
+[[servers]]
 name = "demo-prod"
 kind = "demo"
 """.strip(),
@@ -81,7 +116,7 @@ kind = "demo"
     async with app.run_test() as pilot:
         await pilot.pause()
 
-        table = app.query_one("#containers", DataTable)
+        table = app.query_one("#containers-0", DataTable)
         await wait_until(
             lambda: (
                 table.row_count == 1 and table.get_cell_at(Coordinate(0, 0)) == "api"

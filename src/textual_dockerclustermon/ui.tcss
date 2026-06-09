@@ -8,6 +8,21 @@ Screen {
     padding: 0 1;
 }
 
-#containers {
+#servers {
     height: 1fr;
+}
+
+.server-view {
+    height: auto;
+    margin: 0 0 1 0;
+}
+
+.server-status {
+    background: $panel;
+    height: 1;
+    padding: 0 1;
+}
+
+.server-containers {
+    height: auto;
 }

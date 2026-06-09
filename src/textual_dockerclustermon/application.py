@@ -28,13 +28,16 @@ def create_app_from_config(
     config: AppConfig,
     command_runner_factory: CommandRunnerFactory = create_command_runner,
 ) -> DockerClusterMonitorApp:
-    runner = command_runner_factory(config.server)
-    docker_query = DockerContainerQuery(
-        DockerPsQuery(runner),
-        [DockerStatsQuery(runner)],
-    )
-    monitor = MonitorService(config.server.name, docker_query)
-    return DockerClusterMonitorApp(monitor, config.refresh_seconds)
+    monitors = []
+    for server in config.servers:
+        runner = command_runner_factory(server)
+        docker_query = DockerContainerQuery(
+            DockerPsQuery(runner),
+            [DockerStatsQuery(runner)],
+        )
+        monitors.append(MonitorService(server.name, docker_query))
+
+    return DockerClusterMonitorApp(monitors, config.refresh_seconds)
 
 
 def main() -> None:

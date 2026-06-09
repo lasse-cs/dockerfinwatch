@@ -36,6 +36,10 @@ class MonitorService:
         self._docker_query = docker_query
         self._clock = clock
 
+    @property
+    def server_name(self) -> str:
+        return self._server_name
+
     def refresh(self) -> MonitorSnapshot:
         try:
             containers = self._docker_query.fetch()
