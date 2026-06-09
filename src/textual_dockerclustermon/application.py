@@ -1,4 +1,6 @@
-from collections.abc import Callable
+import argparse
+import os
+from collections.abc import Callable, Mapping
 from contextlib import ExitStack
 from pathlib import Path
 
@@ -14,15 +16,74 @@ from textual_dockerclustermon.runner_factory import create_command_runner
 from textual_dockerclustermon.ui import DockerClusterMonitorApp
 
 
-DEFAULT_CONFIG_PATH = Path("dockerclustermon.toml")
+CONFIG_ENV_VAR = "DOCKERCLUSTERMON_CONFIG"
+CONFIG_FILENAME = "dockerclustermon.toml"
+CONFIG_DIR_NAME = "dockerclustermon"
 CommandRunnerFactory = Callable[[ServerConfig], CommandRunner]
 
 
 def create_app(
-    config_path: Path = DEFAULT_CONFIG_PATH,
+    config_path: Path,
     command_runner_factory: CommandRunnerFactory = create_command_runner,
 ) -> DockerClusterMonitorApp:
     return create_app_from_config(load_config(config_path), command_runner_factory)
+
+
+def resolve_config_path(
+    config_path: Path | None = None,
+    *,
+    environ: Mapping[str, str] | None = None,
+    home: Path | None = None,
+) -> Path:
+    environ = os.environ if environ is None else environ
+
+    if config_path is not None:
+        return _expand_user(config_path, home)
+
+    env_config_path = environ.get(CONFIG_ENV_VAR)
+    if env_config_path is not None:
+        return _expand_user(Path(env_config_path), home)
+
+    config_home = environ.get("XDG_CONFIG_HOME")
+    if config_home is None:
+        config_home_path = (Path.home() if home is None else home) / ".config"
+    else:
+        config_home_path = _expand_user(Path(config_home), home)
+
+    return config_home_path / CONFIG_DIR_NAME / CONFIG_FILENAME
+
+
+def config_path_from_args(
+    argv: list[str] | None = None,
+    *,
+    environ: Mapping[str, str] | None = None,
+    home: Path | None = None,
+) -> Path:
+    args = _argument_parser().parse_args(argv)
+    return resolve_config_path(args.config, environ=environ, home=home)
+
+
+def _argument_parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser()
+    parser.add_argument(
+        "-c",
+        "--config",
+        type=Path,
+        help="Path to config TOML file.",
+    )
+    return parser
+
+
+def _expand_user(path: Path, home: Path | None) -> Path:
+    if home is None:
+        return path.expanduser()
+
+    path_string = str(path)
+    if path_string == "~":
+        return home
+    if path_string.startswith("~/"):
+        return home / path_string[2:]
+    return path
 
 
 def create_app_from_config(
@@ -42,5 +103,5 @@ def create_app_from_config(
     return DockerClusterMonitorApp(monitors, config.refresh_seconds)
 
 
-def main() -> None:
-    create_app().run()
+def main(argv: list[str] | None = None) -> None:
+    create_app(config_path_from_args(argv)).run()

@@ -1,3 +1,4 @@
+from pathlib import Path
 from types import TracebackType
 from typing import Self
 
@@ -6,7 +7,12 @@ from textual.coordinate import Coordinate
 from textual.widgets import DataTable, Static
 
 from helpers import wait_until
-from textual_dockerclustermon.application import create_app
+from textual_dockerclustermon.application import (
+    CONFIG_ENV_VAR,
+    config_path_from_args,
+    create_app,
+    resolve_config_path,
+)
 from textual_dockerclustermon.commands import CommandResult
 
 
@@ -45,6 +51,39 @@ class SequenceCommandRunner:
             stderr="",
             exit_code=0,
         )
+
+
+def test_resolve_config_path_uses_explicit_path() -> None:
+    assert resolve_config_path(
+        Path("~/custom.toml"),
+        environ={CONFIG_ENV_VAR: "/env/dockerclustermon.toml", "XDG_CONFIG_HOME": "/xdg"},
+        home=Path("/home/test-user"),
+    ) == Path("/home/test-user/custom.toml")
+
+
+def test_resolve_config_path_uses_environment_path() -> None:
+    assert resolve_config_path(
+        environ={CONFIG_ENV_VAR: "~/env-config.toml", "XDG_CONFIG_HOME": "/xdg"},
+        home=Path("/home/test-user"),
+    ) == Path("/home/test-user/env-config.toml")
+
+
+def test_resolve_config_path_uses_xdg_config_home() -> None:
+    assert resolve_config_path(environ={"XDG_CONFIG_HOME": "/xdg"}) == Path(
+        "/xdg/dockerclustermon/dockerclustermon.toml"
+    )
+
+
+def test_resolve_config_path_uses_home_config_fallback() -> None:
+    assert resolve_config_path(environ={}, home=Path("/home/test-user")) == Path(
+        "/home/test-user/.config/dockerclustermon/dockerclustermon.toml"
+    )
+
+
+def test_config_path_from_args_uses_config_option(tmp_path) -> None:
+    config_path = tmp_path / "custom.toml"
+
+    assert config_path_from_args(["--config", str(config_path)], environ={}) == config_path
 
 
 @pytest.mark.asyncio

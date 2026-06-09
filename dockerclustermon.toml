@@ -1,6 +1,0 @@
-[defaults]
-refresh_seconds = 60
-
-[[servers]]
-name = "demo-server"
-kind = "demo"
