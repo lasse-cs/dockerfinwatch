@@ -2,7 +2,7 @@ from textual_dockerclustermon.commands import CommandResult
 
 
 class DemoCommandRunner:
-    def run(self, command: str, timeout_seconds: int) -> CommandResult:
+    def run(self, command: str, timeout_seconds: float) -> CommandResult:
         if command.startswith("docker stats"):
             return CommandResult(
                 stdout=(

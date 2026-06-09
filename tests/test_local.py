@@ -19,7 +19,7 @@ class FakeProcessRunner:
     def run(
         self,
         args,
-        timeout_seconds: int,
+        timeout_seconds: float,
     ) -> tuple[str, str, int]:
         self.run_calls.append(
             {

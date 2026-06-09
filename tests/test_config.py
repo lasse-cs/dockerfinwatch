@@ -74,6 +74,25 @@ kind = "demo"
     assert config.refresh_seconds == 30
 
 
+def test_load_config_reads_fractional_refresh_seconds_default(tmp_path) -> None:
+    config_path = tmp_path / "dockerclustermon.toml"
+    config_path.write_text(
+        """
+[defaults]
+refresh_seconds = 0.05
+
+[[servers]]
+name = "demo"
+kind = "demo"
+""".strip(),
+        encoding="utf-8",
+    )
+
+    config = load_config(config_path)
+
+    assert config.refresh_seconds == 0.05
+
+
 def test_load_config_reads_local_server_from_toml(tmp_path) -> None:
     config_path = tmp_path / "dockerclustermon.toml"
     config_path.write_text(

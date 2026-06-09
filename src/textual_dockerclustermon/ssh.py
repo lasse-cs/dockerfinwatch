@@ -17,11 +17,11 @@ class SSHClientError(Exception):
 
 
 class SSHClient(Protocol):
-    def connect(self, config: SSHServerConfig, timeout: int) -> None: ...
+    def connect(self, config: SSHServerConfig, timeout: float) -> None: ...
 
     def is_active(self) -> bool: ...
 
-    def run(self, command: str, timeout_seconds: int) -> CommandResult: ...
+    def run(self, command: str, timeout_seconds: float) -> CommandResult: ...
 
     def close(self) -> None: ...
 
@@ -34,7 +34,7 @@ class ParamikoSSHClient:
         transport = self.client.get_transport()
         return transport is not None and transport.is_active()
 
-    def run(self, command: str, timeout_seconds: int) -> CommandResult:
+    def run(self, command: str, timeout_seconds: float) -> CommandResult:
         try:
             _, stdout, stderr = self.client.exec_command(
                 command,
@@ -48,7 +48,7 @@ class ParamikoSSHClient:
             exit_code=stdout.channel.recv_exit_status(),
         )
 
-    def connect(self, config: SSHServerConfig, timeout: int) -> None:
+    def connect(self, config: SSHServerConfig, timeout: float) -> None:
         ssh_config = _lookup_ssh_config(config)
         try:
             self.client.load_system_host_keys()
@@ -76,7 +76,7 @@ class SSHCommandRunner:
         self._client_factory = client_factory
         self._client: SSHClient | None = None
 
-    def run(self, command: str, timeout_seconds: int) -> CommandResult:
+    def run(self, command: str, timeout_seconds: float) -> CommandResult:
         try:
             client = self._connected_client(timeout_seconds)
             return client.run(command, timeout_seconds)
@@ -87,7 +87,7 @@ class SSHCommandRunner:
                 f"could not run SSH command: {error}"
             ) from error
 
-    def _connected_client(self, timeout_seconds: int) -> SSHClient:
+    def _connected_client(self, timeout_seconds: float) -> SSHClient:
         if self._client is not None:
             if self._client.is_active():
                 return self._client

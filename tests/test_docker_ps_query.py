@@ -14,7 +14,7 @@ class FakeRunner:
         self.result = result
         self.commands: list[str] = []
 
-    def run(self, command: str, timeout_seconds: int) -> CommandResult:
+    def run(self, command: str, timeout_seconds: float) -> CommandResult:
         self.commands.append(command)
         return self.result
 
@@ -24,13 +24,13 @@ class SequenceRunner:
         self.results = results
         self.commands: list[str] = []
 
-    def run(self, command: str, timeout_seconds: int) -> CommandResult:
+    def run(self, command: str, timeout_seconds: float) -> CommandResult:
         self.commands.append(command)
         return self.results.pop(0)
 
 
 class FailingRunner:
-    def run(self, command: str, timeout_seconds: int) -> CommandResult:
+    def run(self, command: str, timeout_seconds: float) -> CommandResult:
         raise CommandConnectionError("authentication failed")
 
 

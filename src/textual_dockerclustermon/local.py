@@ -13,7 +13,7 @@ class LocalProcessRunner(Protocol):
     def run(
         self,
         args: list[str],
-        timeout_seconds: int,
+        timeout_seconds: float,
     ) -> tuple[str, str, int]: ...
 
 
@@ -21,7 +21,7 @@ class SubprocessProcessRunner:
     def run(
         self,
         args: list[str],
-        timeout_seconds: int,
+        timeout_seconds: float,
     ) -> tuple[str, str, int]:
         result = subprocess.run(
             args,
@@ -37,7 +37,7 @@ class LocalCommandRunner:
     def __init__(self, process_runner: LocalProcessRunner) -> None:
         self._process_runner = process_runner
 
-    def run(self, command: str, timeout_seconds: int) -> CommandResult:
+    def run(self, command: str, timeout_seconds: float) -> CommandResult:
         try:
             stdout, stderr, exit_code = self._process_runner.run(
                 shlex.split(command),

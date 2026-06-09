@@ -11,7 +11,7 @@ class SequenceCommandRunner:
     def __init__(self, container_names: list[str]) -> None:
         self._container_names = container_names
 
-    def run(self, command: str, timeout_seconds: int) -> CommandResult:
+    def run(self, command: str, timeout_seconds: float) -> CommandResult:
         if command.startswith("docker stats"):
             return CommandResult(
                 stdout=(

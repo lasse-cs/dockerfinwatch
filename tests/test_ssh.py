@@ -19,13 +19,13 @@ class FakeConnectedSSHClient:
         self.result = CommandResult(stdout="out", stderr="err", exit_code=7)
         self.error: Exception | None = None
 
-    def connect(self, config: SSHServerConfig, timeout: int) -> None:
+    def connect(self, config: SSHServerConfig, timeout: float) -> None:
         self.connect_calls.append({"config": config, "timeout": timeout})
 
     def is_active(self) -> bool:
         return self.active
 
-    def run(self, command: str, timeout_seconds: int) -> CommandResult:
+    def run(self, command: str, timeout_seconds: float) -> CommandResult:
         self.run_calls.append({"command": command, "timeout_seconds": timeout_seconds})
         if self.error is not None:
             raise self.error
@@ -79,7 +79,7 @@ class FakeParamikoSSHClient:
     def get_transport(self) -> FakeTransport | None:
         return self.transport
 
-    def exec_command(self, command: str, timeout: int):
+    def exec_command(self, command: str, timeout: float):
         self.exec_command_calls.append({"command": command, "timeout": timeout})
         return None, self.stdout, self.stderr
 

@@ -46,7 +46,7 @@ class DockerStatsError(DockerQueryError):
 
 
 class DockerPsQuery:
-    def __init__(self, runner: CommandRunner, timeout_seconds: int = 20) -> None:
+    def __init__(self, runner: CommandRunner, timeout_seconds: float = 20) -> None:
         self._runner = runner
         self._timeout_seconds = timeout_seconds
 
@@ -78,7 +78,7 @@ class DockerPsQuery:
 
 
 class DockerStatsQuery:
-    def __init__(self, runner: CommandRunner, timeout_seconds: int = 20) -> None:
+    def __init__(self, runner: CommandRunner, timeout_seconds: float = 20) -> None:
         self._runner = runner
         self._timeout_seconds = timeout_seconds
 

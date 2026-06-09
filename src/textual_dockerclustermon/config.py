@@ -33,7 +33,7 @@ class SSHServerConfig(ServerConfig):
 @dataclass(frozen=True)
 class AppConfig:
     servers: list[ServerConfig]
-    refresh_seconds: int
+    refresh_seconds: float
 
 
 def load_config(path: Path) -> AppConfig:
@@ -45,7 +45,7 @@ def load_config(path: Path) -> AppConfig:
             _load_server_config(server, str(server["kind"]), defaults)
             for server in data["servers"]
         ],
-        refresh_seconds=defaults.get("refresh_seconds", 60),
+        refresh_seconds=float(defaults.get("refresh_seconds", 60)),
     )
 
 
