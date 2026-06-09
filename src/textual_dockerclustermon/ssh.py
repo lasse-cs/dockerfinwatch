@@ -12,7 +12,13 @@ from textual_dockerclustermon.commands import (
 from textual_dockerclustermon.config import SSHServerConfig
 
 
+class SSHClientError(Exception):
+    pass
+
+
 class SSHClient(Protocol):
+    def connect(self, config: SSHServerConfig, timeout: int) -> None: ...
+
     def is_active(self) -> bool: ...
 
     def run(self, command: str, timeout_seconds: int) -> CommandResult: ...
@@ -22,53 +28,51 @@ class SSHClient(Protocol):
 
 class ParamikoSSHClient:
     def __init__(self, client: paramiko.SSHClient) -> None:
-        self._client = client
+        self.client = client
 
     def is_active(self) -> bool:
-        transport = self._client.get_transport()
+        transport = self.client.get_transport()
         return transport is not None and transport.is_active()
 
     def run(self, command: str, timeout_seconds: int) -> CommandResult:
-        _, stdout, stderr = self._client.exec_command(
-            command,
-            timeout=timeout_seconds,
-        )
+        try:
+            _, stdout, stderr = self.client.exec_command(
+                command,
+                timeout=timeout_seconds,
+            )
+        except paramiko.SSHException as e:
+            raise SSHClientError(f"ssh exception: {str(e)}") from e
         return CommandResult(
-            stdout=_read_text(stdout.read()),
-            stderr=_read_text(stderr.read()),
+            stdout=stdout.read().decode(),
+            stderr=stderr.read().decode(),
             exit_code=stdout.channel.recv_exit_status(),
         )
 
+    def connect(self, config: SSHServerConfig, timeout: int) -> None:
+        ssh_config = _lookup_ssh_config(config)
+        try:
+            self.client.load_system_host_keys()
+            self.client.connect(
+                hostname=_hostname(config, ssh_config),
+                port=_port(config, ssh_config),
+                username=_username(config, ssh_config),
+                key_filename=_key_filename(config, ssh_config),
+                timeout=timeout,
+                banner_timeout=timeout,
+                auth_timeout=timeout,
+            )
+        except paramiko.SSHException as e:
+            raise SSHClientError(f"ssh exception: {str(e)}") from e
+
     def close(self) -> None:
-        self._client.close()
-
-
-def create_connected_ssh_client(
-    config: SSHServerConfig,
-    timeout_seconds: int,
-) -> SSHClient:
-    ssh_config = _lookup_ssh_config(config)
-    client = paramiko.SSHClient()
-    client.load_system_host_keys()
-    client.connect(
-        hostname=_hostname(config, ssh_config),
-        port=_port(config, ssh_config),
-        username=_username(config, ssh_config),
-        key_filename=_key_filename(config, ssh_config),
-        timeout=timeout_seconds,
-        banner_timeout=timeout_seconds,
-        auth_timeout=timeout_seconds,
-    )
-    return ParamikoSSHClient(client)
+        self.client.close()
 
 
 class SSHCommandRunner:
     def __init__(
         self,
         config: SSHServerConfig,
-        client_factory: Callable[
-            [SSHServerConfig, int], SSHClient
-        ] = create_connected_ssh_client,
+        client_factory: Callable[[], SSHClient]
     ) -> None:
         self._config = config
         self._client_factory = client_factory
@@ -80,31 +84,21 @@ class SSHCommandRunner:
             return client.run(command, timeout_seconds)
         except TimeoutError as error:
             raise CommandTimeoutError(f"command timed out: {command}") from error
-        except (OSError, paramiko.SSHException) as error:
+        except (OSError, paramiko.SSHException, SSHClientError) as error:
             raise CommandConnectionError(
                 f"could not run SSH command: {error}"
             ) from error
 
-    def _connect_if_needed(self, timeout_seconds: int) -> None:
+    def _connected_client(self, timeout_seconds: int) -> SSHClient:
         if self._client is not None:
             if self._client.is_active():
-                return
+                return self._client
             self._client.close()
             self._client = None
 
-        self._client = self._client_factory(self._config, timeout_seconds)
-
-    def _connected_client(self, timeout_seconds: int) -> SSHClient:
-        self._connect_if_needed(timeout_seconds)
-        if self._client is None:
-            raise CommandConnectionError("could not run SSH command: no SSH client")
+        self._client = self._client_factory()
+        self._client.connect(self._config, timeout_seconds)
         return self._client
-
-
-def _read_text(data: bytes | str) -> str:
-    if isinstance(data, str):
-        return data
-    return data.decode()
 
 
 def _lookup_ssh_config(config: SSHServerConfig) -> dict[str, object]:

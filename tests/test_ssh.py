@@ -7,16 +7,20 @@ from textual_dockerclustermon.commands import (
     CommandTimeoutError,
 )
 from textual_dockerclustermon.config import SSHServerConfig
-from textual_dockerclustermon.ssh import SSHCommandRunner, create_connected_ssh_client
+from textual_dockerclustermon.ssh import ParamikoSSHClient, SSHCommandRunner
 
 
 class FakeConnectedSSHClient:
     def __init__(self) -> None:
         self.active = True
         self.closed = False
+        self.connect_calls = []
         self.run_calls = []
         self.result = CommandResult(stdout="out", stderr="err", exit_code=7)
         self.error: Exception | None = None
+
+    def connect(self, config: SSHServerConfig, timeout: int) -> None:
+        self.connect_calls.append({"config": config, "timeout": timeout})
 
     def is_active(self) -> bool:
         return self.active
@@ -40,11 +44,11 @@ class FakeChannel:
 
 
 class FakeStream:
-    def __init__(self, data: bytes | str, exit_status: int = 0) -> None:
+    def __init__(self, data: bytes, exit_status: int = 0) -> None:
         self._data = data
         self.channel = FakeChannel(exit_status)
 
-    def read(self) -> bytes | str:
+    def read(self) -> bytes:
         return self._data
 
 
@@ -63,7 +67,7 @@ class FakeParamikoSSHClient:
         self.exec_command_calls = []
         self.closed = False
         self.stdout = FakeStream(b"out", exit_status=7)
-        self.stderr = FakeStream("err")
+        self.stderr = FakeStream(b"err")
         self.transport = FakeTransport(active=True)
 
     def load_system_host_keys(self) -> None:
@@ -99,30 +103,26 @@ def test_ssh_command_runner_returns_command_result() -> None:
     factory_calls = []
     config = ssh_config()
 
-    def client_factory(
-        config: SSHServerConfig,
-        timeout_seconds: int,
-    ) -> FakeConnectedSSHClient:
-        factory_calls.append({"config": config, "timeout_seconds": timeout_seconds})
+    def client_factory() -> FakeConnectedSSHClient:
+        factory_calls.append(client)
         return client
 
     runner = SSHCommandRunner(config=config, client_factory=client_factory)
 
     result = runner.run("docker ps", 20)
 
-    assert factory_calls == [{"config": config, "timeout_seconds": 20}]
+    assert factory_calls == [client]
+    assert client.connect_calls == [{"config": config, "timeout": 20}]
     assert client.run_calls == [{"command": "docker ps", "timeout_seconds": 20}]
     assert client.closed is False
     assert result == CommandResult(stdout="out", stderr="err", exit_code=7)
 
 
-def test_create_connected_ssh_client_loads_keys_connects_and_runs_command(
-    monkeypatch,
-) -> None:
+def test_paramiko_ssh_client_loads_keys_connects_and_runs_command() -> None:
     paramiko_client = FakeParamikoSSHClient()
-    monkeypatch.setattr(paramiko, "SSHClient", lambda: paramiko_client)
 
-    client = create_connected_ssh_client(ssh_config(), 20)
+    client = ParamikoSSHClient(paramiko_client)
+    client.connect(ssh_config(), 20)
     result = client.run("docker ps", 10)
 
     assert paramiko_client.loaded_system_host_keys is True
@@ -144,8 +144,7 @@ def test_create_connected_ssh_client_loads_keys_connects_and_runs_command(
     assert result == CommandResult(stdout="out", stderr="err", exit_code=7)
 
 
-def test_create_connected_ssh_client_uses_ssh_config_file(
-    monkeypatch,
+def test_paramiko_ssh_client_uses_ssh_config_file(
     tmp_path,
 ) -> None:
     ssh_config_path = tmp_path / "ssh_config"
@@ -161,9 +160,8 @@ Host prod-alias
         encoding="utf-8",
     )
     paramiko_client = FakeParamikoSSHClient()
-    monkeypatch.setattr(paramiko, "SSHClient", lambda: paramiko_client)
 
-    create_connected_ssh_client(
+    ParamikoSSHClient(paramiko_client).connect(
         SSHServerConfig(
             name="prod",
             host="prod-alias",
@@ -185,8 +183,7 @@ Host prod-alias
     ]
 
 
-def test_create_connected_ssh_client_prefers_explicit_config_values(
-    monkeypatch,
+def test_paramiko_ssh_client_prefers_explicit_config_values(
     tmp_path,
 ) -> None:
     ssh_config_path = tmp_path / "ssh_config"
@@ -202,9 +199,8 @@ Host prod-alias
         encoding="utf-8",
     )
     paramiko_client = FakeParamikoSSHClient()
-    monkeypatch.setattr(paramiko, "SSHClient", lambda: paramiko_client)
 
-    create_connected_ssh_client(
+    ParamikoSSHClient(paramiko_client).connect(
         SSHServerConfig(
             name="prod",
             host="prod-alias",
@@ -233,10 +229,7 @@ def test_ssh_command_runner_reuses_active_connection() -> None:
     client = FakeConnectedSSHClient()
     created_clients = []
 
-    def client_factory(
-        config: SSHServerConfig,
-        timeout_seconds: int,
-    ) -> FakeConnectedSSHClient:
+    def client_factory() -> FakeConnectedSSHClient:
         created_clients.append(client)
         return client
 
@@ -246,6 +239,7 @@ def test_ssh_command_runner_reuses_active_connection() -> None:
     runner.run("docker ps --all", 20)
 
     assert created_clients == [client]
+    assert client.connect_calls == [{"config": ssh_config(), "timeout": 20}]
     assert client.run_calls == [
         {"command": "docker ps", "timeout_seconds": 20},
         {"command": "docker ps --all", "timeout_seconds": 20},
@@ -259,7 +253,7 @@ def test_ssh_command_runner_reconnects_inactive_connection() -> None:
     clients = [stale_client, fresh_client]
     runner = SSHCommandRunner(
         config=ssh_config(),
-        client_factory=lambda config, timeout_seconds: clients.pop(0),
+        client_factory=lambda: clients.pop(0),
     )
 
     runner.run("docker ps", 20)
@@ -267,6 +261,8 @@ def test_ssh_command_runner_reconnects_inactive_connection() -> None:
     runner.run("docker ps --all", 20)
 
     assert stale_client.closed is True
+    assert stale_client.connect_calls == [{"config": ssh_config(), "timeout": 20}]
+    assert fresh_client.connect_calls == [{"config": ssh_config(), "timeout": 20}]
     assert fresh_client.run_calls == [
         {"command": "docker ps --all", "timeout_seconds": 20}
     ]
@@ -277,7 +273,7 @@ def test_ssh_command_runner_wraps_timeouts() -> None:
     client.error = TimeoutError("timed out")
     runner = SSHCommandRunner(
         config=ssh_config(),
-        client_factory=lambda config, timeout_seconds: client,
+        client_factory=lambda: client,
     )
 
     with pytest.raises(CommandTimeoutError) as error:
@@ -289,10 +285,7 @@ def test_ssh_command_runner_wraps_timeouts() -> None:
 
 
 def test_ssh_command_runner_wraps_connection_errors() -> None:
-    def client_factory(
-        config: SSHServerConfig,
-        timeout_seconds: int,
-    ) -> FakeConnectedSSHClient:
+    def client_factory() -> FakeConnectedSSHClient:
         raise paramiko.SSHException("connection failed")
 
     runner = SSHCommandRunner(config=ssh_config(), client_factory=client_factory)
