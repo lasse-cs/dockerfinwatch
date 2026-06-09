@@ -84,7 +84,9 @@ def test_resolve_config_path_uses_home_config_fallback() -> None:
 def test_config_path_from_args_uses_config_option(tmp_path) -> None:
     config_path = tmp_path / "custom.toml"
 
-    assert config_path_from_args(["--config", str(config_path)], environ={}) == config_path
+    assert (
+        config_path_from_args(["--config", str(config_path)], environ={}) == config_path
+    )
 
 
 @pytest.mark.asyncio
