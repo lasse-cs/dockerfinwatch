@@ -87,6 +87,8 @@ def _optional_str(value: object) -> str | None:
 def _optional_int(value: object) -> int | None:
     if value is None:
         return None
+    if not isinstance(value, int | str):
+        raise TypeError(f"Expected an int-compatible value, got {value!r}")
     return int(value)
 
 

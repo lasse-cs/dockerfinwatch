@@ -126,7 +126,10 @@ def _username(config: SSHServerConfig, ssh_config: dict[str, object]) -> str | N
 def _port(config: SSHServerConfig, ssh_config: dict[str, object]) -> int:
     if config.port is not None:
         return config.port
-    return int(ssh_config.get("port", 22))
+    value = ssh_config.get("port", 22)
+    if not isinstance(value, int | str):
+        raise TypeError(f"Expected an int-compatible SSH port, got {value!r}")
+    return int(value)
 
 
 def _key_filename(

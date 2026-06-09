@@ -53,7 +53,7 @@ kind = "demo"
         table = app.query_one("#containers-0", DataTable)
         await wait_until(lambda: table.row_count == 2)
 
-        assert status.content.startswith("demo-prod | last updated ")
+        assert str(status.content).startswith("demo-prod | last updated ")
         assert table.row_count == 2
         assert table.get_cell_at(Coordinate(0, 0)) == "web"
         assert table.get_cell_at(Coordinate(1, 0)) == "cache"
@@ -89,8 +89,8 @@ kind = "demo"
             lambda: first_table.row_count == 2 and second_table.row_count == 2
         )
 
-        assert first_status.content.startswith("demo-a | last updated ")
-        assert second_status.content.startswith("demo-b | last updated ")
+        assert str(first_status.content).startswith("demo-a | last updated ")
+        assert str(second_status.content).startswith("demo-b | last updated ")
         assert first_table.get_cell_at(Coordinate(0, 0)) == "web"
         assert second_table.get_cell_at(Coordinate(0, 0)) == "web"
 
