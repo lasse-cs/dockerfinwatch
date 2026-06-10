@@ -1,7 +1,7 @@
 [project]
 name = "dockerfinwatch"
 version = "0.1.0"
-description = "Add your description here"
+description = "Textual TUI application for monitoring remote and local docker containers"
 readme = "README.md"
 authors = [
     { name = "lasse-cs" }
