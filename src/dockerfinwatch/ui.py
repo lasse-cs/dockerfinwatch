@@ -27,6 +27,7 @@ class Monitor(Protocol):
 
 class LogsScreen(ModalScreen[None]):
     BINDINGS = [
+        ("r", "refresh_logs", "Refresh"),
         ("escape", "dismiss", "Close"),
         ("q", "dismiss", "Close"),
     ]
@@ -43,19 +44,33 @@ class LogsScreen(ModalScreen[None]):
         self._container_id = container_id
         self._container_name = container_name
         self._tail = tail
+        self._refresh_in_progress = False
 
     def compose(self) -> ComposeResult:
         with Vertical(id="logs-dialog"):
             yield Static(
-                f"Logs: {self._container_name} (last {self._tail} lines)",
+                self._title_text(),
                 id="logs-title",
             )
             with VerticalScroll(id="logs-scroll"):
-                yield Static("Loading...", id="logs-content")
+                yield Static("Loading...", id="logs-content", markup=False)
             yield Footer()
 
     def on_mount(self) -> None:
         self.query_one("#logs-scroll", VerticalScroll).anchor()
+        self._refresh_logs("loading...", clear_content=True)
+
+    def action_refresh_logs(self) -> None:
+        self._refresh_logs("refreshing...")
+
+    def _refresh_logs(self, status: str, *, clear_content: bool = False) -> None:
+        if self._refresh_in_progress:
+            return
+
+        self._refresh_in_progress = True
+        self.query_one("#logs-title", Static).update(self._title_text(status))
+        if clear_content:
+            self.query_one("#logs-content", Static).update("Loading...")
         self._fetch_logs_in_background()
 
     @work(thread=True)
@@ -63,14 +78,22 @@ class LogsScreen(ModalScreen[None]):
         try:
             logs = self._monitor.fetch_logs(self._container_id, tail=self._tail)
         except MonitorLogsError as error:
-            self.app.call_from_thread(self._show_logs, f"Error: {error}")
+            self.app.call_from_thread(self._complete_refresh, f"Error: {error}")
         except Exception as error:
             self.app.call_from_thread(self._raise_fatal, error)
         else:
-            self.app.call_from_thread(self._show_logs, logs or "(no output)")
+            self.app.call_from_thread(self._complete_refresh, logs or "(no output)")
 
-    def _show_logs(self, content: str) -> None:
+    def _complete_refresh(self, content: str) -> None:
+        self._refresh_in_progress = False
+        self.query_one("#logs-title", Static).update(self._title_text())
         self.query_one("#logs-content", Static).update(content)
+
+    def _title_text(self, status: str | None = None) -> str:
+        title = f"Logs: {self._container_name} (last {self._tail} lines)"
+        if status is not None:
+            return f"{title} | {status}"
+        return title
 
     def _raise_fatal(self, error: Exception) -> None:
         raise error

@@ -96,10 +96,11 @@ class SequenceMonitorService:
 
 
 class FakeMonitorWithLogs:
-    def __init__(self, snapshot: MonitorSnapshot, logs: str = "") -> None:
+    def __init__(self, snapshot: MonitorSnapshot, logs: list[str]) -> None:
         self.snapshot = snapshot
-        self._logs = logs
+        self._logs = logs.copy()
         self.logs_fetched_for: str | None = None
+        self.logs_fetch_count = 0
 
     @property
     def server_name(self) -> str:
@@ -110,7 +111,39 @@ class FakeMonitorWithLogs:
 
     def fetch_logs(self, container_id: str, tail: int) -> str:
         self.logs_fetched_for = container_id
-        return self._logs
+        self.logs_fetch_count += 1
+        if len(self._logs) > 1:
+            return self._logs.pop(0)
+        if self._logs:
+            return self._logs[0]
+        return ""
+
+    def close(self) -> None:
+        pass
+
+
+class BlockingRefreshMonitorWithLogs:
+    def __init__(self, snapshot: MonitorSnapshot) -> None:
+        self.snapshot = snapshot
+        self.logs_fetch_count = 0
+        self.second_fetch_started = threading.Event()
+        self.release_second_fetch = threading.Event()
+
+    @property
+    def server_name(self) -> str:
+        return self.snapshot.server_name
+
+    def refresh(self) -> MonitorSnapshot:
+        return self.snapshot
+
+    def fetch_logs(self, container_id: str, tail: int) -> str:
+        self.logs_fetch_count += 1
+        if self.logs_fetch_count == 1:
+            return "first log"
+
+        self.second_fetch_started.set()
+        self.release_second_fetch.wait(timeout=1)
+        return "second log"
 
     def close(self) -> None:
         pass
@@ -359,7 +392,7 @@ async def test_app_preserves_table_when_manual_refresh_fails() -> None:
 async def test_pressing_l_opens_logs_screen_for_highlighted_container() -> None:
     monitor = FakeMonitorWithLogs(
         snapshot=snapshot_with_container("web"),
-        logs="container startup log\n",
+        logs=["container startup log\n"],
     )
     app = DockerFinWatchApp([monitor], refresh_seconds=60, log_tail_lines=100)
 
@@ -382,7 +415,7 @@ async def test_pressing_l_opens_logs_screen_for_highlighted_container() -> None:
 async def test_logs_screen_opens_scrolled_to_latest_logs() -> None:
     monitor = FakeMonitorWithLogs(
         snapshot=snapshot_with_container("web"),
-        logs="\n".join(f"log line {line}" for line in range(100)),
+        logs=["\n".join(f"log line {line}" for line in range(100))],
     )
     app = DockerFinWatchApp([monitor], refresh_seconds=60, log_tail_lines=100)
 
@@ -404,10 +437,94 @@ async def test_logs_screen_opens_scrolled_to_latest_logs() -> None:
 
 
 @pytest.mark.asyncio
+async def test_logs_screen_renders_bracketed_log_text_literally() -> None:
+    log_line = (
+        '2026-06-16T17:00:14Z common.go:121 ERROR '
+        '[Job "publish_social" (b8db8c585ed1)] Finished in "14.7s", '
+        'failed: true, skipped: false, error: none'
+    )
+    monitor = FakeMonitorWithLogs(
+        snapshot=snapshot_with_container("web"),
+        logs=[log_line],
+    )
+    app = DockerFinWatchApp([monitor], refresh_seconds=60, log_tail_lines=100)
+
+    async with app.run_test() as pilot:
+        table = app.query_one("#containers-0", DataTable)
+        await wait_until(lambda: table.row_count == 1)
+
+        table.focus()
+        await pilot.press("l")
+        await wait_until(lambda: isinstance(app.screen, LogsScreen))
+
+        logs_content = app.screen.query_one("#logs-content", Static)
+        await wait_until(lambda: log_line in str(logs_content.content))
+
+        assert log_line in str(logs_content.content)
+        assert logs_content._render_markup is False
+
+
+@pytest.mark.asyncio
+async def test_pressing_r_refreshes_open_logs_screen() -> None:
+    monitor = FakeMonitorWithLogs(
+        snapshot=snapshot_with_container("web"),
+        logs=["first log", "second log"],
+    )
+    app = DockerFinWatchApp([monitor], refresh_seconds=60, log_tail_lines=100)
+
+    async with app.run_test() as pilot:
+        table = app.query_one("#containers-0", DataTable)
+        await wait_until(lambda: table.row_count == 1)
+
+        table.focus()
+        await pilot.press("l")
+        await wait_until(lambda: isinstance(app.screen, LogsScreen))
+
+        logs_content = app.screen.query_one("#logs-content", Static)
+        await wait_until(lambda: "first log" in str(logs_content.content))
+
+        await pilot.press("r")
+        await wait_until(lambda: "second log" in str(logs_content.content))
+
+        assert "first log" not in str(logs_content.content)
+        assert monitor.logs_fetched_for == "abc123"
+        assert monitor.logs_fetch_count == 2
+
+
+@pytest.mark.asyncio
+async def test_refreshing_logs_keeps_existing_content_until_fetch_completes() -> None:
+    monitor = BlockingRefreshMonitorWithLogs(snapshot=snapshot_with_container("web"))
+    app = DockerFinWatchApp([monitor], refresh_seconds=60, log_tail_lines=100)
+
+    async with app.run_test() as pilot:
+        table = app.query_one("#containers-0", DataTable)
+        await wait_until(lambda: table.row_count == 1)
+
+        table.focus()
+        await pilot.press("l")
+        await wait_until(lambda: isinstance(app.screen, LogsScreen))
+
+        logs_title = app.screen.query_one("#logs-title", Static)
+        logs_content = app.screen.query_one("#logs-content", Static)
+        await wait_until(lambda: "first log" in str(logs_content.content))
+
+        await pilot.press("r")
+        assert await asyncio.to_thread(monitor.second_fetch_started.wait, 1)
+
+        assert logs_title.content == "Logs: web (last 100 lines) | refreshing..."
+        assert logs_content.content == "first log"
+
+        monitor.release_second_fetch.set()
+        await wait_until(lambda: "second log" in str(logs_content.content))
+
+        assert logs_title.content == "Logs: web (last 100 lines)"
+
+
+@pytest.mark.asyncio
 async def test_pressing_escape_closes_logs_screen() -> None:
     monitor = FakeMonitorWithLogs(
         snapshot=snapshot_with_container("web"),
-        logs="some log line\n",
+        logs=["some log line\n"],
     )
     app = DockerFinWatchApp([monitor], refresh_seconds=60, log_tail_lines=100)
 
