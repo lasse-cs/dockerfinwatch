@@ -3,7 +3,7 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import Protocol
 
-from dockerfinwatch.docker import Container, DockerQueryError
+from dockerfinwatch.docker import Container, DockerLogsError, DockerQueryError
 
 
 @dataclass(frozen=True)
@@ -17,8 +17,16 @@ class MonitorRefreshError(Exception):
     pass
 
 
+class MonitorLogsError(Exception):
+    pass
+
+
 class DockerQuery(Protocol):
     def fetch(self) -> list[Container]: ...
+
+
+class LogsQuery(Protocol):
+    def fetch(self, container_id: str, tail: int) -> str: ...
 
 
 def utc_now() -> datetime:
@@ -30,11 +38,13 @@ class MonitorService:
         self,
         server_name: str,
         docker_query: DockerQuery,
+        logs_query: LogsQuery | None = None,
         cleanup: Callable[[], None] | None = None,
         clock: Callable[[], datetime] = utc_now,
     ) -> None:
         self._server_name = server_name
         self._docker_query = docker_query
+        self._logs_query = logs_query
         self._cleanup = cleanup
         self._clock = clock
 
@@ -53,6 +63,14 @@ class MonitorService:
             containers=containers,
             updated_at=self._clock(),
         )
+
+    def fetch_logs(self, container_id: str, tail: int) -> str:
+        if self._logs_query is None:
+            raise MonitorLogsError("no logs query configured")
+        try:
+            return self._logs_query.fetch(container_id, tail=tail)
+        except DockerLogsError as error:
+            raise MonitorLogsError(f"docker logs failed: {error}") from error
 
     def close(self) -> None:
         if self._cleanup is None:

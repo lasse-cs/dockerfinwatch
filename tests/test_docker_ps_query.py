@@ -7,6 +7,8 @@ import pytest
 from dockerfinwatch.commands import CommandConnectionError, CommandResult
 from dockerfinwatch.docker import (
     DockerContainerQuery,
+    DockerLogsError,
+    DockerLogsQuery,
     DockerPsError,
     DockerPsQuery,
     DockerStatsQuery,
@@ -177,4 +179,47 @@ def test_docker_ps_query_wraps_command_runner_failures() -> None:
         DockerPsQuery(FailingRunner()).fetch()
 
     assert "could not run docker ps" in str(error.value)
+    assert isinstance(error.value.__cause__, CommandConnectionError)
+
+
+def test_docker_logs_query_runs_correct_command_and_returns_output() -> None:
+    runner = FakeRunner(
+        CommandResult(
+            stdout="2024-01-01T00:00:02.000000000Z Server listening on port 80\n",
+            stderr="2024-01-01T00:00:01.000000000Z Starting container\n",
+            exit_code=0,
+        )
+    )
+
+    logs = DockerLogsQuery(runner).fetch("abc123", tail=50)
+
+    assert runner.commands == [
+        ["docker", "logs", "--timestamps", "--tail", "50", "abc123"]
+    ]
+    assert logs == (
+        "2024-01-01T00:00:01.000000000Z Starting container\n"
+        "2024-01-01T00:00:02.000000000Z Server listening on port 80\n"
+    )
+
+
+def test_docker_logs_query_raises_on_nonzero_exit() -> None:
+    runner = FakeRunner(
+        CommandResult(
+            stdout="",
+            stderr="Error: No such container: missing",
+            exit_code=1,
+        )
+    )
+
+    with pytest.raises(DockerLogsError) as error:
+        DockerLogsQuery(runner).fetch("missing", tail=100)
+
+    assert "No such container" in str(error.value)
+
+
+def test_docker_logs_query_wraps_command_runner_failures() -> None:
+    with pytest.raises(DockerLogsError) as error:
+        DockerLogsQuery(FailingRunner()).fetch("abc123", tail=100)
+
+    assert "could not run docker logs" in str(error.value)
     assert isinstance(error.value.__cause__, CommandConnectionError)

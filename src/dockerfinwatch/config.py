@@ -34,6 +34,7 @@ class SSHServerConfig(ServerConfig):
 class AppConfig:
     servers: list[ServerConfig]
     refresh_seconds: float
+    log_tail_lines: int
 
 
 def load_config(path: Path) -> AppConfig:
@@ -46,6 +47,7 @@ def load_config(path: Path) -> AppConfig:
             for server in data["servers"]
         ],
         refresh_seconds=float(defaults.get("refresh_seconds", 60)),
+        log_tail_lines=int(defaults.get("log_tail_lines", 100)),
     )
 
 

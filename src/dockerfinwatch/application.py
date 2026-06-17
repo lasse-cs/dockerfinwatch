@@ -8,6 +8,7 @@ from dockerfinwatch.commands import CommandRunner
 from dockerfinwatch.config import AppConfig, ServerConfig, load_config
 from dockerfinwatch.docker import (
     DockerContainerQuery,
+    DockerLogsQuery,
     DockerPsQuery,
     DockerStatsQuery,
 )
@@ -98,9 +99,12 @@ def create_app_from_config(
             DockerPsQuery(runner),
             [DockerStatsQuery(runner)],
         )
-        monitors.append(MonitorService(server.name, docker_query, cleanup=stack.close))
+        logs_query = DockerLogsQuery(runner)
+        monitors.append(
+            MonitorService(server.name, docker_query, logs_query=logs_query, cleanup=stack.close)
+        )
 
-    return DockerFinWatchApp(monitors, config.refresh_seconds)
+    return DockerFinWatchApp(monitors, config.refresh_seconds, config.log_tail_lines)
 
 
 def main(argv: list[str] | None = None) -> None:

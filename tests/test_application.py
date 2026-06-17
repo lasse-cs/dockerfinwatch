@@ -12,9 +12,11 @@ from dockerfinwatch.application import (
     CONFIG_ENV_VAR,
     config_path_from_args,
     create_app,
+    create_app_from_config,
     resolve_config_path,
 )
 from dockerfinwatch.commands import CommandResult
+from dockerfinwatch.config import AppConfig, DemoServerConfig
 
 
 class SequenceCommandRunner:
@@ -181,3 +183,36 @@ kind = "demo"
         )
 
     assert runner.closed is True
+
+
+def test_create_app_passes_log_tail_lines_from_config(tmp_path) -> None:
+    config = AppConfig(
+        servers=[DemoServerConfig(name="demo")],
+        refresh_seconds=60,
+        log_tail_lines=250,
+    )
+
+    app = create_app_from_config(config)
+
+    assert app._log_tail_lines == 250
+
+
+@pytest.mark.asyncio
+async def test_create_app_with_demo_server_can_fetch_logs(tmp_path) -> None:
+    config_path = tmp_path / "config.toml"
+    config_path.write_text(
+        """
+[[servers]]
+name = "demo-prod"
+kind = "demo"
+""".strip(),
+        encoding="utf-8",
+    )
+
+    app = create_app(config_path)
+
+    async with app.run_test():
+        monitor = app._monitors[0]
+        logs = monitor.fetch_logs("abc123", tail=100)
+
+    assert "demo" in logs.lower()

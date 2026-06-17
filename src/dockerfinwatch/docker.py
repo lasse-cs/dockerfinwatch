@@ -45,6 +45,10 @@ class DockerStatsError(DockerQueryError):
     pass
 
 
+class DockerLogsError(DockerQueryError):
+    pass
+
+
 class DockerPsQuery:
     def __init__(self, runner: CommandRunner, timeout_seconds: float = 20) -> None:
         self._runner = runner
@@ -116,6 +120,78 @@ class DockerStatsQuery:
                 pids=data["PIDs"],
             ),
         )
+
+
+DOCKER_LOGS_COMMAND = ["docker", "logs", "--timestamps", "--tail"]
+
+
+@dataclass(frozen=True)
+class DockerLogEntry:
+    timestamp: str
+    message: str
+    stream_order: int
+    line_order: int
+
+    @property
+    def rendered(self) -> str:
+        if not self.timestamp:
+            return self.message
+        return f"{self.timestamp} {self.message}"
+
+    @property
+    def sort_key(self) -> tuple[int, str, int, int]:
+        if not self.timestamp:
+            return (1, self.timestamp, self.stream_order, self.line_order)
+        return (0, self.timestamp, self.stream_order, self.line_order)
+
+
+class DockerLogsQuery:
+    def __init__(self, runner: CommandRunner, timeout_seconds: float = 20) -> None:
+        self._runner = runner
+        self._timeout_seconds = timeout_seconds
+
+    def fetch(self, container_id: str, tail: int) -> str:
+        command = [*DOCKER_LOGS_COMMAND, str(tail), container_id]
+        try:
+            result = self._runner.run(command, self._timeout_seconds)
+        except CommandError as error:
+            raise DockerLogsError(f"could not run docker logs: {error}") from error
+
+        if result.exit_code != 0:
+            raise DockerLogsError(
+                result.stderr or f"docker logs exited with {result.exit_code}"
+            )
+
+        entries = [
+            *self._log_entries(result.stdout, stream_order=0),
+            *self._log_entries(result.stderr, stream_order=1),
+        ]
+        if not entries:
+            return ""
+
+        return (
+            "\n".join(
+                entry.rendered for entry in sorted(entries, key=lambda e: e.sort_key)
+            )
+            + "\n"
+        )
+
+    def _log_entries(self, output: str, stream_order: int) -> list[DockerLogEntry]:
+        entries = []
+        for line_order, line in enumerate(output.splitlines()):
+            timestamp, separator, message = line.partition(" ")
+            if not separator:
+                timestamp = ""
+                message = line
+            entries.append(
+                DockerLogEntry(
+                    timestamp=timestamp,
+                    message=message,
+                    stream_order=stream_order,
+                    line_order=line_order,
+                )
+            )
+        return entries
 
 
 class DockerContainerQuery:

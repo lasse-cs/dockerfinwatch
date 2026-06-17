@@ -4,11 +4,12 @@ from datetime import UTC, datetime
 
 import pytest
 from textual.coordinate import Coordinate
+from textual.containers import VerticalScroll
 from textual.widgets import DataTable, Static
 
 from dockerfinwatch.docker import Container, ContainerMetadata, ContainerStats
 from dockerfinwatch.monitor import MonitorRefreshError, MonitorSnapshot
-from dockerfinwatch.ui import DockerFinWatchApp
+from dockerfinwatch.ui import DockerFinWatchApp, LogsScreen
 from helpers import wait_until
 
 
@@ -25,6 +26,9 @@ class FakeMonitorService:
     def refresh(self) -> MonitorSnapshot:
         self.refresh_count += 1
         return self.snapshot
+
+    def fetch_logs(self, container_id: str, tail: int) -> str:
+        return ""
 
     def close(self) -> None:
         self.close_count += 1
@@ -49,6 +53,9 @@ class BlockingMonitorService:
         self.release.wait(timeout=1)
         return self.snapshot
 
+    def fetch_logs(self, container_id: str, tail: int) -> str:
+        return ""
+
     def close(self) -> None:
         pass
 
@@ -58,6 +65,9 @@ class FailingMonitorService:
 
     def refresh(self) -> MonitorSnapshot:
         raise MonitorRefreshError("docker ps failed: permission denied")
+
+    def fetch_logs(self, container_id: str, tail: int) -> str:
+        return ""
 
     def close(self) -> None:
         pass
@@ -77,6 +87,30 @@ class SequenceMonitorService:
         if isinstance(result, MonitorRefreshError):
             raise result
         return result
+
+    def fetch_logs(self, container_id: str, tail: int) -> str:
+        return ""
+
+    def close(self) -> None:
+        pass
+
+
+class FakeMonitorWithLogs:
+    def __init__(self, snapshot: MonitorSnapshot, logs: str = "") -> None:
+        self.snapshot = snapshot
+        self._logs = logs
+        self.logs_fetched_for: str | None = None
+
+    @property
+    def server_name(self) -> str:
+        return self.snapshot.server_name
+
+    def refresh(self) -> MonitorSnapshot:
+        return self.snapshot
+
+    def fetch_logs(self, container_id: str, tail: int) -> str:
+        self.logs_fetched_for = container_id
+        return self._logs
 
     def close(self) -> None:
         pass
@@ -129,7 +163,7 @@ async def test_app_displays_monitor_snapshot_in_table() -> None:
             updated_at=datetime(2026, 6, 8, 12, 30, tzinfo=UTC),
         )
     )
-    app = DockerFinWatchApp([monitor])
+    app = DockerFinWatchApp([monitor], refresh_seconds=60, log_tail_lines=100)
 
     async with app.run_test() as pilot:
         await pilot.pause()
@@ -161,7 +195,11 @@ async def test_app_displays_monitor_snapshot_in_table() -> None:
 async def test_app_displays_one_table_per_monitor() -> None:
     first_monitor = FakeMonitorService(snapshot_with_container("web", "prod-a"))
     second_monitor = FakeMonitorService(snapshot_with_container("api", "prod-b"))
-    app = DockerFinWatchApp([first_monitor, second_monitor])
+    app = DockerFinWatchApp(
+        [first_monitor, second_monitor],
+        refresh_seconds=60,
+        log_tail_lines=100,
+    )
 
     async with app.run_test() as pilot:
         await pilot.pause()
@@ -187,7 +225,7 @@ async def test_app_displays_one_table_per_monitor() -> None:
 @pytest.mark.asyncio
 async def test_app_refreshes_on_configured_interval() -> None:
     monitor = FakeMonitorService(snapshot_with_container("web"))
-    app = DockerFinWatchApp([monitor], refresh_seconds=0.05)
+    app = DockerFinWatchApp([monitor], refresh_seconds=0.05, log_tail_lines=100)
 
     async with app.run_test() as pilot:
         await pilot.pause()
@@ -201,7 +239,7 @@ async def test_app_refreshes_on_configured_interval() -> None:
 async def test_app_runs_refresh_in_worker_thread() -> None:
     main_thread_id = threading.get_ident()
     monitor = BlockingMonitorService(snapshot_with_container("web"))
-    app = DockerFinWatchApp([monitor])
+    app = DockerFinWatchApp([monitor], refresh_seconds=60, log_tail_lines=100)
 
     async with app.run_test() as pilot:
         await pilot.pause()
@@ -223,7 +261,7 @@ async def test_app_runs_refresh_in_worker_thread() -> None:
 @pytest.mark.asyncio
 async def test_app_marks_table_loading_during_initial_refresh() -> None:
     monitor = BlockingMonitorService(snapshot_with_container("web"))
-    app = DockerFinWatchApp([monitor])
+    app = DockerFinWatchApp([monitor], refresh_seconds=60, log_tail_lines=100)
 
     async with app.run_test() as pilot:
         await pilot.pause()
@@ -243,7 +281,11 @@ async def test_app_marks_table_loading_during_initial_refresh() -> None:
 async def test_app_refreshes_servers_independently() -> None:
     slow_monitor = BlockingMonitorService(snapshot_with_container("web", "slow"))
     fast_monitor = FakeMonitorService(snapshot_with_container("api", "fast"))
-    app = DockerFinWatchApp([slow_monitor, fast_monitor])
+    app = DockerFinWatchApp(
+        [slow_monitor, fast_monitor],
+        refresh_seconds=60,
+        log_tail_lines=100,
+    )
 
     async with app.run_test() as pilot:
         await pilot.pause()
@@ -263,7 +305,11 @@ async def test_app_refreshes_servers_independently() -> None:
 
 @pytest.mark.asyncio
 async def test_app_shows_status_when_docker_ps_refresh_fails() -> None:
-    app = DockerFinWatchApp([FailingMonitorService()])
+    app = DockerFinWatchApp(
+        [FailingMonitorService()],
+        refresh_seconds=60,
+        log_tail_lines=100,
+    )
 
     async with app.run_test() as pilot:
         await pilot.pause()
@@ -288,7 +334,9 @@ async def test_app_preserves_table_when_manual_refresh_fails() -> None:
                     MonitorRefreshError("docker ps failed: permission denied"),
                 ]
             )
-        ]
+        ],
+        refresh_seconds=60,
+        log_tail_lines=100,
     )
 
     async with app.run_test() as pilot:
@@ -305,3 +353,73 @@ async def test_app_preserves_table_when_manual_refresh_fails() -> None:
         assert status.content == "prod | docker ps failed: permission denied"
         assert table.row_count == 1
         assert table.get_cell_at(Coordinate(0, 0)) == "web"
+
+
+@pytest.mark.asyncio
+async def test_pressing_l_opens_logs_screen_for_highlighted_container() -> None:
+    monitor = FakeMonitorWithLogs(
+        snapshot=snapshot_with_container("web"),
+        logs="container startup log\n",
+    )
+    app = DockerFinWatchApp([monitor], refresh_seconds=60, log_tail_lines=100)
+
+    async with app.run_test() as pilot:
+        table = app.query_one("#containers-0", DataTable)
+        await wait_until(lambda: table.row_count == 1)
+
+        table.focus()
+        await pilot.press("l")
+        await wait_until(lambda: isinstance(app.screen, LogsScreen))
+
+        logs_content = app.screen.query_one("#logs-content", Static)
+        await wait_until(lambda: "container startup log" in str(logs_content.content))
+
+        assert "container startup log" in str(logs_content.content)
+        assert monitor.logs_fetched_for == "abc123"
+
+
+@pytest.mark.asyncio
+async def test_logs_screen_opens_scrolled_to_latest_logs() -> None:
+    monitor = FakeMonitorWithLogs(
+        snapshot=snapshot_with_container("web"),
+        logs="\n".join(f"log line {line}" for line in range(100)),
+    )
+    app = DockerFinWatchApp([monitor], refresh_seconds=60, log_tail_lines=100)
+
+    async with app.run_test() as pilot:
+        table = app.query_one("#containers-0", DataTable)
+        await wait_until(lambda: table.row_count == 1)
+
+        table.focus()
+        await pilot.press("l")
+        await wait_until(lambda: isinstance(app.screen, LogsScreen))
+
+        logs_scroll = app.screen.query_one("#logs-scroll", VerticalScroll)
+        await wait_until(
+            lambda: logs_scroll.max_scroll_y > 0
+            and logs_scroll.scroll_y == logs_scroll.max_scroll_y
+        )
+
+        assert logs_scroll.scroll_y == logs_scroll.max_scroll_y
+
+
+@pytest.mark.asyncio
+async def test_pressing_escape_closes_logs_screen() -> None:
+    monitor = FakeMonitorWithLogs(
+        snapshot=snapshot_with_container("web"),
+        logs="some log line\n",
+    )
+    app = DockerFinWatchApp([monitor], refresh_seconds=60, log_tail_lines=100)
+
+    async with app.run_test() as pilot:
+        table = app.query_one("#containers-0", DataTable)
+        await wait_until(lambda: table.row_count == 1)
+
+        table.focus()
+        await pilot.press("l")
+        await wait_until(lambda: isinstance(app.screen, LogsScreen))
+
+        await pilot.press("escape")
+        await wait_until(lambda: not isinstance(app.screen, LogsScreen))
+
+        assert not isinstance(app.screen, LogsScreen)

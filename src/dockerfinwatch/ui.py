@@ -3,9 +3,15 @@ from typing import Protocol
 from textual import work
 from textual.app import App, ComposeResult
 from textual.containers import Vertical, VerticalScroll
+from textual.coordinate import Coordinate
+from textual.screen import ModalScreen
 from textual.widgets import DataTable, Footer, Header, Static
 
-from dockerfinwatch.monitor import MonitorRefreshError, MonitorSnapshot
+from dockerfinwatch.monitor import MonitorLogsError, MonitorRefreshError, MonitorSnapshot
+
+
+CONTAINER_NAME_COLUMN_KEY = "name"
+CONTAINER_ID_COLUMN_KEY = "id"
 
 
 class Monitor(Protocol):
@@ -14,20 +20,77 @@ class Monitor(Protocol):
 
     def refresh(self) -> MonitorSnapshot: ...
 
+    def fetch_logs(self, container_id: str, tail: int) -> str: ...
+
     def close(self) -> None: ...
 
 
+class LogsScreen(ModalScreen[None]):
+    BINDINGS = [
+        ("escape", "dismiss", "Close"),
+        ("q", "dismiss", "Close"),
+    ]
+
+    def __init__(
+        self,
+        monitor: Monitor,
+        container_id: str,
+        container_name: str,
+        tail: int,
+    ) -> None:
+        super().__init__()
+        self._monitor = monitor
+        self._container_id = container_id
+        self._container_name = container_name
+        self._tail = tail
+
+    def compose(self) -> ComposeResult:
+        with Vertical(id="logs-dialog"):
+            yield Static(
+                f"Logs: {self._container_name} (last {self._tail} lines)",
+                id="logs-title",
+            )
+            with VerticalScroll(id="logs-scroll"):
+                yield Static("Loading...", id="logs-content")
+            yield Footer()
+
+    def on_mount(self) -> None:
+        self.query_one("#logs-scroll", VerticalScroll).anchor()
+        self._fetch_logs_in_background()
+
+    @work(thread=True)
+    def _fetch_logs_in_background(self) -> None:
+        try:
+            logs = self._monitor.fetch_logs(self._container_id, tail=self._tail)
+        except MonitorLogsError as error:
+            self.app.call_from_thread(self._show_logs, f"Error: {error}")
+        except Exception as error:
+            self.app.call_from_thread(self._raise_fatal, error)
+        else:
+            self.app.call_from_thread(self._show_logs, logs or "(no output)")
+
+    def _show_logs(self, content: str) -> None:
+        self.query_one("#logs-content", Static).update(content)
+
+    def _raise_fatal(self, error: Exception) -> None:
+        raise error
+
+
 class ServerMonitorView(Vertical):
+    BINDINGS = [("l", "view_logs", "View Logs")]
+
     def __init__(
         self,
         monitor: Monitor,
         index: int,
         refresh_seconds: float,
+        log_tail_lines: int,
     ) -> None:
         super().__init__(id=f"server-{index}", classes="server-view")
         self._monitor = monitor
         self._index = index
         self._refresh_seconds = refresh_seconds
+        self._log_tail_lines = log_tail_lines
         self._refresh_in_progress = False
         self._ready = False
 
@@ -50,7 +113,7 @@ class ServerMonitorView(Vertical):
     def on_mount(self) -> None:
         table = self.query_one(f"#containers-{self._index}", DataTable)
         table.add_columns(
-            "Name",
+            ("Name", CONTAINER_NAME_COLUMN_KEY),
             "Image",
             "Status",
             "CPU",
@@ -60,7 +123,7 @@ class ServerMonitorView(Vertical):
             "Block I/O",
             "PIDs",
             "Ports",
-            "ID",
+            ("ID", CONTAINER_ID_COLUMN_KEY),
         )
         self._ready = True
         self.set_interval(self._refresh_seconds, self.refresh_monitor)
@@ -141,6 +204,30 @@ class ServerMonitorView(Vertical):
             "ready",
         )
 
+    def action_view_logs(self) -> None:
+        table = self.query_one(f"#containers-{self._index}", DataTable)
+        if table.row_count == 0:
+            return
+
+        idx = table.cursor_row
+        if idx >= table.row_count:
+            return
+
+        container_name = table.get_cell_at(
+            Coordinate(idx, table.get_column_index(CONTAINER_NAME_COLUMN_KEY))
+        )
+        container_id = table.get_cell_at(
+            Coordinate(idx, table.get_column_index(CONTAINER_ID_COLUMN_KEY))
+        )
+        self.app.push_screen(
+            LogsScreen(
+                self._monitor,
+                str(container_id),
+                str(container_name),
+                self._log_tail_lines,
+            )
+        )
+
     def _finish_loading(self) -> None:
         table = self.query_one(f"#containers-{self._index}", DataTable)
         table.loading = False
@@ -155,17 +242,28 @@ class DockerFinWatchApp(App[None]):
         ("q", "quit", "Quit"),
     ]
 
-    def __init__(self, monitors: list[Monitor], refresh_seconds: float = 60) -> None:
+    def __init__(
+        self,
+        monitors: list[Monitor],
+        refresh_seconds: float,
+        log_tail_lines: int,
+    ) -> None:
         super().__init__()
         self._monitors = monitors
         self._refresh_seconds = refresh_seconds
+        self._log_tail_lines = log_tail_lines
 
     def compose(self) -> ComposeResult:
         yield Header(show_clock=True)
         yield Static(self._server_count_status(), id="status")
         with VerticalScroll(id="servers"):
             for index, monitor in enumerate(self._monitors):
-                yield ServerMonitorView(monitor, index, self._refresh_seconds)
+                yield ServerMonitorView(
+                    monitor,
+                    index,
+                    self._refresh_seconds,
+                    self._log_tail_lines,
+                )
         yield Footer()
 
     def action_refresh(self) -> None:

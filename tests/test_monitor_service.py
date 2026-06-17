@@ -2,8 +2,8 @@ from datetime import UTC, datetime
 
 import pytest
 
-from dockerfinwatch.docker import Container, ContainerMetadata, DockerPsError
-from dockerfinwatch.monitor import MonitorRefreshError, MonitorService
+from dockerfinwatch.docker import Container, ContainerMetadata, DockerLogsError, DockerPsError
+from dockerfinwatch.monitor import MonitorLogsError, MonitorRefreshError, MonitorService
 
 
 class FakeDockerPsQuery:
@@ -19,6 +19,21 @@ class FakeDockerPsQuery:
 class FailingDockerPsQuery:
     def fetch(self) -> list[Container]:
         raise DockerPsError("permission denied")
+
+
+class FakeLogsQuery:
+    def __init__(self, logs: str = "") -> None:
+        self.logs = logs
+        self.calls: list[tuple[str, int]] = []
+
+    def fetch(self, container_id: str, tail: int) -> str:
+        self.calls.append((container_id, tail))
+        return self.logs
+
+
+class FailingLogsQuery:
+    def fetch(self, container_id: str, tail: int) -> str:
+        raise DockerLogsError("permission denied")
 
 
 def test_monitor_service_returns_server_snapshot() -> None:
@@ -72,3 +87,30 @@ def test_monitor_service_closes_cleanup_once() -> None:
     monitor.close()
 
     assert cleanup_calls == ["closed"]
+
+
+def test_monitor_service_fetch_logs_delegates_to_logs_query() -> None:
+    logs_query = FakeLogsQuery(logs="line 1\nline 2\n")
+    monitor = MonitorService(
+        server_name="prod",
+        docker_query=FakeDockerPsQuery([]),
+        logs_query=logs_query,
+    )
+
+    result = monitor.fetch_logs("abc123", tail=50)
+
+    assert logs_query.calls == [("abc123", 50)]
+    assert result == "line 1\nline 2\n"
+
+
+def test_monitor_service_wraps_logs_errors() -> None:
+    monitor = MonitorService(
+        server_name="prod",
+        docker_query=FakeDockerPsQuery([]),
+        logs_query=FailingLogsQuery(),
+    )
+
+    with pytest.raises(MonitorLogsError) as error:
+        monitor.fetch_logs("abc123", tail=100)
+
+    assert isinstance(error.value.__cause__, DockerLogsError)

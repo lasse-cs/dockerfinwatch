@@ -217,3 +217,38 @@ kind = "unknown"
         load_config(config_path)
 
     assert "Unsupported server kind: unknown" in str(error.value)
+
+
+def test_load_config_defaults_log_tail_lines_to_100(tmp_path) -> None:
+    config_path = tmp_path / "config.toml"
+    config_path.write_text(
+        """
+[[servers]]
+name = "demo"
+kind = "demo"
+""".strip(),
+        encoding="utf-8",
+    )
+
+    config = load_config(config_path)
+
+    assert config.log_tail_lines == 100
+
+
+def test_load_config_reads_log_tail_lines_from_defaults(tmp_path) -> None:
+    config_path = tmp_path / "config.toml"
+    config_path.write_text(
+        """
+[defaults]
+log_tail_lines = 200
+
+[[servers]]
+name = "demo"
+kind = "demo"
+""".strip(),
+        encoding="utf-8",
+    )
+
+    config = load_config(config_path)
+
+    assert config.log_tail_lines == 200

@@ -104,3 +104,33 @@ Footer {
     color: $text;
     text-style: bold;
 }
+
+LogsScreen {
+    align: center middle;
+    background: $background 60%;
+}
+
+#logs-dialog {
+    background: $surface;
+    border: round $primary;
+    height: 80%;
+    layout: vertical;
+    padding: 0;
+    width: 90%;
+}
+
+#logs-title {
+    background: $primary;
+    color: $background;
+    height: 1;
+    padding: 0 2;
+    text-style: bold;
+}
+
+#logs-scroll {
+    height: 1fr;
+}
+
+#logs-content {
+    padding: 1 2;
+}

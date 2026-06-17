@@ -28,6 +28,17 @@ class DemoCommandRunner:
                 exit_code=0,
             )
 
+        if command[:2] == ["docker", "logs"]:
+            return CommandResult(
+                stdout=(
+                    "2024-01-01T00:00:00Z [demo] Container starting\n"
+                    "2024-01-01T00:00:01Z [demo] Listening on port 80\n"
+                    "2024-01-01T00:00:02Z [demo] Ready\n"
+                ),
+                stderr="",
+                exit_code=0,
+            )
+
         return CommandResult(
             stdout=(
                 '{"ID":"abc123","Image":"nginx:latest","Names":"web","Ports":"0.0.0.0:8080->80/tcp","Status":"Up 2 minutes"}\n'
